@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Singing Feedback — Prototyp</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header>
+  <h1>Singing Feedback — Phase-1-Prototyp</h1>
+  <p class="hint">
+    Lokaler Prototyp: MIDI-Referenz hochladen, Spur wählen, kurze Gesangsaufnahme (WAV/MP3, 20–60s)
+    hochladen. Es findet noch keine Ausrichtung (DTW), Bewertung oder Claude-Feedback statt — nur
+    die rohe Gegenüberstellung beider Tonhöhenkurven.
+  </p>
+</header>
+
+<main>
+  <section id="midi-section">
+    <h2>1. MIDI-Referenz</h2>
+    <input type="file" id="midi-input" accept=".mid,.midi">
+    <div id="midi-status" class="status"></div>
+    <div id="track-list"></div>
+  </section>
+
+  <section id="audio-section" class="disabled">
+    <h2>2. Gesangsaufnahme</h2>
+    <p class="hint" id="audio-hint">Bitte zuerst oben eine Spur auswählen.</p>
+    <input type="file" id="audio-input" accept=".wav,.mp3,.flac,.ogg,.m4a" disabled>
+    <div id="audio-status" class="status"></div>
+  </section>
+
+  <section id="chart-section">
+    <h2>3. Vergleich (roh, ohne Ausrichtung)</h2>
+    <div class="legend">
+      <span class="legend-item"><span class="swatch target"></span> Sollmelodie (MIDI)</span>
+      <span class="legend-item"><span class="swatch sung"></span> Gesungen (Aufnahme)</span>
+    </div>
+    <canvas id="pitch-canvas" width="1000" height="420"></canvas>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

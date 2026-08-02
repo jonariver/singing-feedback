@@ -1,0 +1,17 @@
+# Phase 0/1 (aktiv genutzt)
+fastapi>=0.115
+uvicorn[standard]>=0.32
+python-multipart>=0.0.12
+pretty_midi>=0.2.10
+librosa>=0.10.2
+numpy>=1.26
+scipy>=1.13
+soundfile>=0.12
+python-dotenv>=1.0
+pytest>=8.0
+
+# Ab Phase 3 (Browser-Aufnahme dekodieren) und Phase 6 (Claude-Feedback) benoetigt,
+# hier bereits gelistet, damit ein einmaliges "pip install -r requirements.txt" reicht.
+av>=13.0
+anthropic>=0.40
+pyyaml>=6.0

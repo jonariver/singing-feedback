@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+tests/fixtures/*.mid
+tests/fixtures/*.wav
+*.egg-info/
+.playwright-mcp/

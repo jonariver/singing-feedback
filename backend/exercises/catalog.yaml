@@ -1,0 +1,23 @@
+# Kuratierter Uebungskatalog (Platzhalter, wird ab Phase 6 vom feedback-Modul genutzt).
+# Claude soll bevorzugt aus diesen Eintraegen waehlen statt Uebungen frei zu erfinden.
+
+- id: absinkende_phrasenenden
+  problem: Unkontrolliertes Absinken am Ende einer gehaltenen Phrase
+  technik: Gleichmaessiger, gestuetzter Luftstrom bis zum Phrasenende
+  uebung: Lip Trill oder "vvv" auf der Phrase, bewusst bis zum letzten Ton gleichmaessig halten
+- id: instabile_lange_toene
+  problem: Instabile/schwankende gehaltene Toene
+  technik: Kontrolle von Atemdruck und Kehlkopfposition auf einem gehaltenen Ton
+  uebung: Leise gehaltene Toene mit moeglichst gleichmaessiger Lautstaerke ueben
+- id: unsaubere_einsaetze
+  problem: Zielton wird beim Einsatz verfehlt oder unsauber getroffen
+  technik: Ton vor dem eigentlichen Einsatz auf neutralem Laut vorbereiten
+  uebung: Zielton zunaechst kurz auf "ng" oder "mum" anstimmen, dann auf den Text wechseln
+- id: haeufiges_hineingleiten
+  problem: Auffaelliges Hineingleiten/Schleifen in den Zielton statt direktem Treffen
+  technik: Zielton innerlich vorhoeren, bevor er gesungen wird
+  uebung: Zielton vor dem Einsatz innerlich vorstellen oder kurz über einen Referenzton anspielen
+- id: timingprobleme
+  problem: Zu frueher oder verspaeteter Einsatz relativ zur Referenzmelodie
+  technik: Rhythmus vom Tonhoehenverlauf entkoppeln und getrennt ueben
+  uebung: Text zunaechst rhythmisch sprechen, danach auf einem Ton singen, erst danach die volle Melodie
