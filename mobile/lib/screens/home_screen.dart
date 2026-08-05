@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../state/session_state.dart';
 import '../widgets/pitch_chart.dart';
+import '../widgets/playback_button.dart';
 import '../widgets/recording_control.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/track_candidate_card.dart';
@@ -70,7 +71,17 @@ class HomeScreen extends StatelessWidget {
                 enabled: true,
                 onAudioReady: (bytes, filename) => session.analyzeReference(bytes, filename),
               ),
-              StatusBanner(status: session.referenceStatus, message: session.referenceMessage),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatusBanner(
+                      status: session.referenceStatus,
+                      message: session.referenceMessage,
+                    ),
+                  ),
+                  PlaybackButton(audioBytes: session.referenceAudioBytes),
+                ],
+              ),
             ],
             if (session.audioSectionEnabled) ...[
               const SizedBox(height: 8),
@@ -86,7 +97,17 @@ class HomeScreen extends StatelessWidget {
               enabled: session.audioSectionEnabled,
               onAudioReady: (bytes, filename) => session.analyzeAudio(bytes, filename),
             ),
-            StatusBanner(status: session.audioStatus, message: session.audioMessage),
+            Row(
+              children: [
+                Expanded(
+                  child: StatusBanner(
+                    status: session.audioStatus,
+                    message: session.audioMessage,
+                  ),
+                ),
+                PlaybackButton(audioBytes: session.sungAudioBytes),
+              ],
+            ),
             const Divider(height: 32),
             Text('3. Tonhöhen-Vergleich', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
