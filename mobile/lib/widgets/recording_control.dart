@@ -30,6 +30,7 @@ class _RecordingControlState extends State<RecordingControl> {
   late final StreamSubscription<void> _playerCompleteSubscription;
   bool _isRecording = false;
   bool _isPlaying = false;
+  bool _isBusy = false;
   Uint8List? _pendingAudio;
   String? _pendingFilename;
   String? _errorMessage;
@@ -107,27 +108,37 @@ class _RecordingControlState extends State<RecordingControl> {
   }
 
   Future<void> _discard() async {
+    if (_isBusy) return;
     if (_isPlaying) {
+      setState(() => _isBusy = true);
       await _player.stop();
+    } else {
+      setState(() => _isBusy = true);
     }
     setState(() {
       _pendingAudio = null;
       _pendingFilename = null;
       _isPlaying = false;
+      _isBusy = false;
     });
   }
 
   Future<void> _confirm() async {
+    if (_isBusy) return;
     final bytes = _pendingAudio;
     final filename = _pendingFilename;
     if (bytes == null || filename == null) return;
     if (_isPlaying) {
+      setState(() => _isBusy = true);
       await _player.stop();
+    } else {
+      setState(() => _isBusy = true);
     }
     setState(() {
       _pendingAudio = null;
       _pendingFilename = null;
       _isPlaying = false;
+      _isBusy = false;
     });
     widget.onAudioReady(bytes, filename);
   }
@@ -158,18 +169,18 @@ class _RecordingControlState extends State<RecordingControl> {
           Row(
             children: [
               IconButton(
-                onPressed: _togglePlayback,
+                onPressed: _isBusy ? null : _togglePlayback,
                 icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
                 tooltip: _isPlaying ? 'Pause' : 'Abspielen',
               ),
               IconButton(
-                onPressed: _discard,
+                onPressed: _isBusy ? null : _discard,
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Löschen',
               ),
               const SizedBox(width: 12),
               ElevatedButton(
-                onPressed: _confirm,
+                onPressed: _isBusy ? null : _confirm,
                 child: const Text('Verwenden'),
               ),
             ],
