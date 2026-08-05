@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
@@ -8,6 +11,8 @@ import '../models/target_point.dart';
 import '../models/track_candidate.dart';
 
 enum LoadStatus { idle, loading, ok, error }
+
+enum ReferenceSource { midi, recording }
 
 /// Spiegelt das `state`-Objekt aus frontend/app.js als ChangeNotifier, damit die
 /// Widgets denselben Ablauf (MIDI-Upload -> Spurwahl -> Aufnahme -> Kurven) fahren.
@@ -29,7 +34,25 @@ class SessionState extends ChangeNotifier {
   LoadStatus audioStatus = LoadStatus.idle;
   String audioMessage = '';
 
-  bool get audioSectionEnabled => selectedTrackIndex != null;
+  ReferenceSource referenceSource = ReferenceSource.midi;
+  List<SungPoint> referenceRawCurve = [];
+  LoadStatus referenceStatus = LoadStatus.idle;
+  String referenceMessage = '';
+
+  bool get audioSectionEnabled => referenceSource == ReferenceSource.midi
+      ? selectedTrackIndex != null
+      : referenceRawCurve.isNotEmpty;
+
+  List<TargetPoint> get displayedTargetCurve {
+    if (referenceSource == ReferenceSource.midi) return targetCurve;
+    return referenceRawCurve
+        .map((p) => TargetPoint(
+              t: p.t,
+              hz: p.hz == null ? null : p.hz! * math.pow(2, transposeSemitones / 12),
+              midiNote: null,
+            ))
+        .toList();
+  }
 
   Future<void> uploadMidi(Uint8List bytes, String filename) async {
     midiStatus = LoadStatus.loading;
@@ -68,6 +91,11 @@ class SessionState extends ChangeNotifier {
   }
 
   Future<void> setTranspose(int semitones) async {
+    if (referenceSource == ReferenceSource.recording) {
+      transposeSemitones = semitones;
+      notifyListeners();
+      return;
+    }
     if (selectedTrackIndex == null) return;
     transposeSemitones = semitones;
     await _reloadTargetCurve();
@@ -102,6 +130,30 @@ class SessionState extends ChangeNotifier {
       audioStatus = LoadStatus.error;
       audioMessage = 'Fehler: ${_messageOf(e)}';
     }
+    notifyListeners();
+  }
+
+  Future<void> analyzeReference(Uint8List bytes, String filename) async {
+    referenceStatus = LoadStatus.loading;
+    referenceMessage = 'Analysiere Referenzaufnahme…';
+    notifyListeners();
+    try {
+      referenceRawCurve = await audioApi.analyzeAudio(bytes, filename);
+      referenceStatus = LoadStatus.ok;
+      referenceMessage =
+          'Referenz analysiert. Jetzt eine Gesangsaufnahme aufnehmen oder hochladen.';
+    } catch (e) {
+      referenceStatus = LoadStatus.error;
+      referenceMessage = 'Fehler: ${_messageOf(e)}';
+    }
+    notifyListeners();
+  }
+
+  void setReferenceSource(ReferenceSource source) {
+    referenceSource = source;
+    sungCurve = [];
+    audioStatus = LoadStatus.idle;
+    audioMessage = '';
     notifyListeners();
   }
 
