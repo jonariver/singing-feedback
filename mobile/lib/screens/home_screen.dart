@@ -75,7 +75,7 @@ class HomeScreen extends StatelessWidget {
             if (session.audioSectionEnabled) ...[
               const SizedBox(height: 8),
               TransposeControl(
-                value: session.transposeSemitones,
+                value: session.displayedTranspose,
                 onChanged: session.setTranspose,
               ),
             ],

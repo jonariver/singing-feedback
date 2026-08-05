@@ -62,7 +62,8 @@ void main() {
 
     await session.setTranspose(12);
 
-    expect(session.transposeSemitones, 12);
+    expect(session.referenceTransposeSemitones, 12);
+    expect(session.displayedTranspose, 12);
     expect(session.displayedTargetCurve[0].hz, closeTo(440.0 * math.pow(2, 1), 0.01));
     // Keine erneute Analyse ausgeloest: dieselbe Roh-Kurven-Instanz wie vor dem Transpose.
     expect(identical(session.referenceRawCurve, curveBeforeTranspose), isTrue);
@@ -86,5 +87,40 @@ void main() {
     session.setReferenceSource(ReferenceSource.recording);
 
     expect(session.referenceRawCurve.length, 2);
+  });
+
+  test(
+      'transponieren im Referenz-Modus laesst den MIDI-Transpose und dessen '
+      'targetCurve unangetastet (Regression fuer Desync beim Moduswechsel)',
+      () async {
+    final session = _buildSession();
+    // MIDI-Modus: Spur ausgewaehlt, targetCurve wie vom Server fuer +5 Halbtoene
+    // zurueckgeliefert simulieren, ohne einen echten MIDI-Upload zu benoetigen.
+    session.selectedTrackIndex = 0;
+    session.targetCurve = const [TargetPoint(t: 0.0, hz: 220.0, midiNote: 57)];
+    await session.setTranspose(5);
+
+    expect(session.transposeSemitones, 5);
+    expect(session.displayedTranspose, 5);
+    final targetCurveAfterMidiTranspose = session.targetCurve;
+
+    // Wechsel in den Referenz-Modus, Referenz laden und dort einen anderen
+    // Transpose-Wert setzen. Das darf transposeSemitones/targetCurve nicht anfassen.
+    session.setReferenceSource(ReferenceSource.recording);
+    await session.analyzeReference(Uint8List(0), 'referenz.wav');
+    await session.setTranspose(0);
+
+    expect(session.referenceTransposeSemitones, 0);
+    expect(session.displayedTranspose, 0);
+    expect(session.transposeSemitones, 5,
+        reason: 'MIDI-Transpose darf durch den Referenz-Modus nicht ueberschrieben werden');
+
+    // Zurueck zu MIDI: Regler und Kurve muessen wieder den +5-Zustand zeigen,
+    // nicht den zuletzt im Referenz-Modus gesetzten Wert (0).
+    session.setReferenceSource(ReferenceSource.midi);
+
+    expect(session.displayedTranspose, 5);
+    expect(session.transposeSemitones, 5);
+    expect(session.displayedTargetCurve, targetCurveAfterMidiTranspose);
   });
 }

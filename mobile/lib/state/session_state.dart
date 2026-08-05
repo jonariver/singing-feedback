@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -26,6 +25,7 @@ class SessionState extends ChangeNotifier {
   List<TrackCandidate> candidates = [];
   int? selectedTrackIndex;
   int transposeSemitones = 0;
+  int referenceTransposeSemitones = 0;
   List<TargetPoint> targetCurve = [];
   List<SungPoint> sungCurve = [];
 
@@ -43,12 +43,21 @@ class SessionState extends ChangeNotifier {
       ? selectedTrackIndex != null
       : referenceRawCurve.isNotEmpty;
 
+  /// Der fuer die aktuelle Quelle jeweils relevante Transpose-Wert, an den die
+  /// UI (TransposeControl) gebunden werden soll, damit der angezeigte Regler-
+  /// Wert nie vom tatsaechlich gerenderten Kurvenzustand abweicht.
+  int get displayedTranspose => referenceSource == ReferenceSource.midi
+      ? transposeSemitones
+      : referenceTransposeSemitones;
+
   List<TargetPoint> get displayedTargetCurve {
     if (referenceSource == ReferenceSource.midi) return targetCurve;
     return referenceRawCurve
         .map((p) => TargetPoint(
               t: p.t,
-              hz: p.hz == null ? null : p.hz! * math.pow(2, transposeSemitones / 12),
+              hz: p.hz == null
+                  ? null
+                  : p.hz! * math.pow(2, referenceTransposeSemitones / 12),
               midiNote: null,
             ))
         .toList();
@@ -92,7 +101,7 @@ class SessionState extends ChangeNotifier {
 
   Future<void> setTranspose(int semitones) async {
     if (referenceSource == ReferenceSource.recording) {
-      transposeSemitones = semitones;
+      referenceTransposeSemitones = semitones;
       notifyListeners();
       return;
     }
@@ -150,6 +159,7 @@ class SessionState extends ChangeNotifier {
   }
 
   void setReferenceSource(ReferenceSource source) {
+    if (source == referenceSource) return;
     referenceSource = source;
     sungCurve = [];
     audioStatus = LoadStatus.idle;
