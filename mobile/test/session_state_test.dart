@@ -123,4 +123,31 @@ void main() {
     expect(session.transposeSemitones, 5);
     expect(session.displayedTargetCurve, targetCurveAfterMidiTranspose);
   });
+
+  test('analyzeAudio und analyzeReference setzen die Roh-Audio-Bytes fuer Playback-nach-Upload',
+      () async {
+    final session = _buildSession();
+    final referenceBytes = Uint8List.fromList([1, 2, 3]);
+    final sungBytes = Uint8List.fromList([4, 5, 6]);
+
+    session.setReferenceSource(ReferenceSource.recording);
+    await session.analyzeReference(referenceBytes, 'referenz.wav');
+    await session.analyzeAudio(sungBytes, 'gesang.wav');
+
+    expect(session.referenceAudioBytes, referenceBytes);
+    expect(session.sungAudioBytes, sungBytes);
+  });
+
+  test('setReferenceSource setzt sungAudioBytes zurueck, referenceAudioBytes bleibt erhalten',
+      () async {
+    final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.recording);
+    await session.analyzeReference(Uint8List.fromList([1, 2, 3]), 'referenz.wav');
+    await session.analyzeAudio(Uint8List.fromList([4, 5, 6]), 'gesang.wav');
+
+    session.setReferenceSource(ReferenceSource.midi);
+
+    expect(session.sungAudioBytes, isNull);
+    expect(session.referenceAudioBytes, isNotNull);
+  });
 }

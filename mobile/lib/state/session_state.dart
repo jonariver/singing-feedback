@@ -38,6 +38,8 @@ class SessionState extends ChangeNotifier {
   List<SungPoint> referenceRawCurve = [];
   LoadStatus referenceStatus = LoadStatus.idle;
   String referenceMessage = '';
+  Uint8List? referenceAudioBytes;
+  Uint8List? sungAudioBytes;
 
   bool get audioSectionEnabled => referenceSource == ReferenceSource.midi
       ? selectedTrackIndex != null
@@ -128,6 +130,7 @@ class SessionState extends ChangeNotifier {
   }
 
   Future<void> analyzeAudio(Uint8List bytes, String filename) async {
+    sungAudioBytes = bytes;
     audioStatus = LoadStatus.loading;
     audioMessage = 'Analysiere Tonhöhe der Aufnahme…';
     notifyListeners();
@@ -143,6 +146,7 @@ class SessionState extends ChangeNotifier {
   }
 
   Future<void> analyzeReference(Uint8List bytes, String filename) async {
+    referenceAudioBytes = bytes;
     referenceStatus = LoadStatus.loading;
     referenceMessage = 'Analysiere Referenzaufnahme…';
     notifyListeners();
@@ -162,6 +166,7 @@ class SessionState extends ChangeNotifier {
     if (source == referenceSource) return;
     referenceSource = source;
     sungCurve = [];
+    sungAudioBytes = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
     notifyListeners();
@@ -171,6 +176,7 @@ class SessionState extends ChangeNotifier {
     selectedTrackIndex = null;
     targetCurve = [];
     sungCurve = [];
+    sungAudioBytes = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
   }
