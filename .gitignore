@@ -7,3 +7,4 @@ tests/fixtures/*.mid
 tests/fixtures/*.wav
 *.egg-info/
 .playwright-mcp/
+.worktrees/
