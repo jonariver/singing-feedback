@@ -41,8 +41,8 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 8),
             SegmentedButton<ReferenceSource>(
               segments: const [
-                ButtonSegment(value: ReferenceSource.midi, label: Text('MIDI-Datei')),
                 ButtonSegment(value: ReferenceSource.recording, label: Text('Eigene Aufnahme')),
+                ButtonSegment(value: ReferenceSource.midi, label: Text('MIDI-Datei')),
               ],
               selected: {session.referenceSource},
               onSelectionChanged: (selection) => session.setReferenceSource(selection.first),
