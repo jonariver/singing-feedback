@@ -23,6 +23,7 @@ class _PlaybackButtonState extends State<PlaybackButton> {
   bool _isPlaying = false;
   bool _isBusy = false;
   String? _errorMessage;
+  Object? _playbackToken;
 
   @override
   void initState() {
@@ -39,6 +40,7 @@ class _PlaybackButtonState extends State<PlaybackButton> {
       unawaited(_player.stop());
       _isPlaying = false;
       _errorMessage = null;
+      _playbackToken = Object();
     }
   }
 
@@ -52,12 +54,15 @@ class _PlaybackButtonState extends State<PlaybackButton> {
   Future<void> _togglePlayback() async {
     if (_isBusy || widget.audioBytes == null) return;
     setState(() => _isBusy = true);
+    final token = _playbackToken;
     try {
       if (_isPlaying) {
         await _player.pause();
+        if (!mounted || token != _playbackToken) return;
         setState(() => _isPlaying = false);
       } else {
         await _player.play(BytesSource(widget.audioBytes!));
+        if (!mounted || token != _playbackToken) return;
         setState(() => _isPlaying = true);
       }
     } catch (e) {
@@ -70,8 +75,9 @@ class _PlaybackButtonState extends State<PlaybackButton> {
   @override
   Widget build(BuildContext context) {
     if (widget.audioBytes == null) return const SizedBox.shrink();
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         IconButton(
           onPressed: _isBusy ? null : _togglePlayback,
@@ -79,7 +85,8 @@ class _PlaybackButtonState extends State<PlaybackButton> {
           tooltip: _isPlaying ? 'Pause' : 'Erneut abspielen',
         ),
         if (_errorMessage != null)
-          Flexible(
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
             child: Text(
               _errorMessage!,
               style: TextStyle(color: Colors.red.shade300, fontSize: 12),
