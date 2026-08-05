@@ -94,6 +94,8 @@ class _RecordingControlState extends State<RecordingControl> {
   }
 
   Future<void> _togglePlayback() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
     try {
       if (_isPlaying) {
         await _player.pause();
@@ -104,6 +106,8 @@ class _RecordingControlState extends State<RecordingControl> {
       }
     } catch (e) {
       setState(() => _errorMessage = 'Wiedergabe fehlgeschlagen: $e');
+    } finally {
+      setState(() => _isBusy = false);
     }
   }
 
