@@ -105,9 +105,9 @@ class _RecordingControlState extends State<RecordingControl> {
         setState(() => _isPlaying = true);
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Wiedergabe fehlgeschlagen: $e');
+      if (mounted) setState(() => _errorMessage = 'Wiedergabe fehlgeschlagen: $e');
     } finally {
-      setState(() => _isBusy = false);
+      if (mounted) setState(() => _isBusy = false);
     }
   }
 
@@ -119,14 +119,16 @@ class _RecordingControlState extends State<RecordingControl> {
         await _player.stop();
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Löschen fehlgeschlagen: $e');
+      if (mounted) setState(() => _errorMessage = 'Löschen fehlgeschlagen: $e');
     } finally {
-      setState(() {
-        _pendingAudio = null;
-        _pendingFilename = null;
-        _isPlaying = false;
-        _isBusy = false;
-      });
+      if (mounted) {
+        setState(() {
+          _pendingAudio = null;
+          _pendingFilename = null;
+          _isPlaying = false;
+          _isBusy = false;
+        });
+      }
     }
   }
 
@@ -141,12 +143,15 @@ class _RecordingControlState extends State<RecordingControl> {
         await _player.stop();
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Bestätigung fehlgeschlagen: $e';
-        _isBusy = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Bestätigung fehlgeschlagen: $e';
+          _isBusy = false;
+        });
+      }
       return;
     }
+    if (!mounted) return;
     setState(() {
       _pendingAudio = null;
       _pendingFilename = null;

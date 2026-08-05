@@ -79,7 +79,10 @@ class HomeScreen extends StatelessWidget {
                       message: session.referenceMessage,
                     ),
                   ),
-                  Flexible(child: PlaybackButton(audioBytes: session.referenceAudioBytes)),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: PlaybackButton(audioBytes: session.referenceAudioBytes),
+                  ),
                 ],
               ),
             ],
@@ -105,7 +108,10 @@ class HomeScreen extends StatelessWidget {
                     message: session.audioMessage,
                   ),
                 ),
-                Flexible(child: PlaybackButton(audioBytes: session.sungAudioBytes)),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: PlaybackButton(audioBytes: session.sungAudioBytes),
+                ),
               ],
             ),
             const Divider(height: 32),
