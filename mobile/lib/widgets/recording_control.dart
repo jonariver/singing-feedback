@@ -181,7 +181,7 @@ class _RecordingControlState extends State<RecordingControl> {
         else
           Row(
             children: [
-              IconButton(
+              IconButton.filled(
                 onPressed: _isBusy ? null : _togglePlayback,
                 icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
                 tooltip: _isPlaying ? 'Pause' : 'Abspielen',
@@ -201,7 +201,7 @@ class _RecordingControlState extends State<RecordingControl> {
         if (_errorMessage != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(_errorMessage!, style: TextStyle(color: Colors.red.shade700)),
+            child: Text(_errorMessage!, style: TextStyle(color: Colors.red.shade300)),
           ),
       ],
     );

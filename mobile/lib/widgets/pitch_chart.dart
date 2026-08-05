@@ -53,7 +53,7 @@ class _PitchChartPainter extends CustomPainter {
   static const double _padRight = 12;
   static const double _padTop = 12;
   static const double _padBottom = 28;
-  static const _targetColor = Color(0xFF2563EB);
+  static const _targetColor = Color(0xFF00C2CB);
   static const _sungColor = Color(0xFFEA580C);
   static const _gridColor = Color(0x339CA3AF);
   static const _labelColor = Color(0xFF9CA3AF);

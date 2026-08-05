@@ -24,7 +24,7 @@ class TrackCandidateCard extends StatelessWidget {
         '${candidate.nameHintMatch ? " · Namenstreffer" : ""}';
 
     return Card(
-      color: selected ? Colors.blue.shade50 : null,
+      color: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.15) : null,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -37,7 +37,7 @@ class TrackCandidateCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 candidate.warnings.join(' '),
-                style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
+                style: TextStyle(color: Colors.orange.shade300, fontSize: 12),
               ),
             ],
             const SizedBox(height: 8),

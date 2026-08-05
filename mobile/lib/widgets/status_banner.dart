@@ -12,9 +12,9 @@ class StatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     if (message.isEmpty) return const SizedBox.shrink();
     final Color color = switch (status) {
-      LoadStatus.error => Colors.red.shade700,
-      LoadStatus.ok => Colors.green.shade700,
-      _ => Colors.grey.shade700,
+      LoadStatus.error => Colors.red.shade300,
+      LoadStatus.ok => Colors.green.shade300,
+      _ => Colors.grey.shade400,
     };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
