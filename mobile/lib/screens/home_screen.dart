@@ -37,25 +37,42 @@ class HomeScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('1. MIDI-Referenzspur', style: Theme.of(context).textTheme.titleMedium),
+            Text('1. Zielmelodie', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () => _pickMidi(context),
-              icon: const Icon(Icons.upload_file),
-              label: const Text('MIDI-Datei wählen'),
+            SegmentedButton<ReferenceSource>(
+              segments: const [
+                ButtonSegment(value: ReferenceSource.midi, label: Text('MIDI-Datei')),
+                ButtonSegment(value: ReferenceSource.recording, label: Text('Eigene Aufnahme')),
+              ],
+              selected: {session.referenceSource},
+              onSelectionChanged: (selection) => session.setReferenceSource(selection.first),
             ),
-            StatusBanner(status: session.midiStatus, message: session.midiMessage),
-            ...session.candidates.map(
-              (c) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: TrackCandidateCard(
-                  candidate: c,
-                  selected: session.selectedTrackIndex == c.index,
-                  onSelect: () => session.selectTrack(c.index),
+            const SizedBox(height: 8),
+            if (session.referenceSource == ReferenceSource.midi) ...[
+              ElevatedButton.icon(
+                onPressed: () => _pickMidi(context),
+                icon: const Icon(Icons.upload_file),
+                label: const Text('MIDI-Datei wählen'),
+              ),
+              StatusBanner(status: session.midiStatus, message: session.midiMessage),
+              ...session.candidates.map(
+                (c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TrackCandidateCard(
+                    candidate: c,
+                    selected: session.selectedTrackIndex == c.index,
+                    onSelect: () => session.selectTrack(c.index),
+                  ),
                 ),
               ),
-            ),
-            if (session.selectedTrackIndex != null) ...[
+            ] else ...[
+              RecordingControl(
+                enabled: true,
+                onAudioReady: (bytes, filename) => session.analyzeReference(bytes, filename),
+              ),
+              StatusBanner(status: session.referenceStatus, message: session.referenceMessage),
+            ],
+            if (session.audioSectionEnabled) ...[
               const SizedBox(height: 8),
               TransposeControl(
                 value: session.transposeSemitones,
@@ -76,7 +93,10 @@ class HomeScreen extends StatelessWidget {
             SizedBox(
               height: 300,
               width: double.infinity,
-              child: PitchChart(targetCurve: session.targetCurve, sungCurve: session.sungCurve),
+              child: PitchChart(
+                targetCurve: session.displayedTargetCurve,
+                sungCurve: session.sungCurve,
+              ),
             ),
           ],
         ),
