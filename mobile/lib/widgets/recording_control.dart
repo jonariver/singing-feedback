@@ -109,18 +109,21 @@ class _RecordingControlState extends State<RecordingControl> {
 
   Future<void> _discard() async {
     if (_isBusy) return;
-    if (_isPlaying) {
-      setState(() => _isBusy = true);
-      await _player.stop();
-    } else {
-      setState(() => _isBusy = true);
+    setState(() => _isBusy = true);
+    try {
+      if (_isPlaying) {
+        await _player.stop();
+      }
+    } catch (e) {
+      setState(() => _errorMessage = 'Löschen fehlgeschlagen: $e');
+    } finally {
+      setState(() {
+        _pendingAudio = null;
+        _pendingFilename = null;
+        _isPlaying = false;
+        _isBusy = false;
+      });
     }
-    setState(() {
-      _pendingAudio = null;
-      _pendingFilename = null;
-      _isPlaying = false;
-      _isBusy = false;
-    });
   }
 
   Future<void> _confirm() async {
@@ -128,11 +131,17 @@ class _RecordingControlState extends State<RecordingControl> {
     final bytes = _pendingAudio;
     final filename = _pendingFilename;
     if (bytes == null || filename == null) return;
-    if (_isPlaying) {
-      setState(() => _isBusy = true);
-      await _player.stop();
-    } else {
-      setState(() => _isBusy = true);
+    setState(() => _isBusy = true);
+    try {
+      if (_isPlaying) {
+        await _player.stop();
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Bestätigung fehlgeschlagen: $e';
+        _isBusy = false;
+      });
+      return;
     }
     setState(() {
       _pendingAudio = null;
