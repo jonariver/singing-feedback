@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'api/api_client.dart';
@@ -24,7 +25,26 @@ class SingingFeedbackApp extends StatelessWidget {
       ),
       child: MaterialApp(
         title: 'Singing Feedback',
-        theme: ThemeData(colorSchemeSeed: const Color(0xFF2563EB), useMaterial3: true),
+        theme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF00C2CB),
+            brightness: Brightness.dark,
+          ).copyWith(
+            primary: const Color(0xFF00C2CB),
+            secondary: const Color(0xFF39C0D4),
+            surface: const Color(0xFF121111),
+            onSurfaceVariant: const Color(0xFF8A9A9D),
+          ),
+          textTheme: GoogleFonts.jostTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(shape: const StadiumBorder()),
+          ),
+          segmentedButtonTheme: SegmentedButtonThemeData(
+            style: SegmentedButton.styleFrom(shape: const StadiumBorder()),
+          ),
+        ),
         home: const HomeScreen(),
       ),
     );
