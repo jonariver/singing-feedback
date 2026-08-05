@@ -7,13 +7,24 @@ lokale Start unter Windows so einfach wie moeglich bleibt (siehe run.py).
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.routes import router as api_router
+from backend.config import CORS_ALLOWED_ORIGINS
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 app = FastAPI(title="Singing Feedback MVP")
+
+if CORS_ALLOWED_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ALLOWED_ORIGINS,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 app.include_router(api_router)
 
 # Muss nach den API-Routen gemountet werden: der Root-Mount faengt sonst alles ab.

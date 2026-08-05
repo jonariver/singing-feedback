@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import tempfile
 
+import av
 import librosa
 import numpy as np
 
@@ -24,6 +25,29 @@ class PitchAnalysisError(Exception):
 def _safe_suffix(filename_hint: str) -> str:
     suffix = os.path.splitext(filename_hint or "")[1].lower()
     return suffix if suffix in _ALLOWED_SUFFIXES else ".wav"
+
+
+def _load_with_pyav(path: str) -> tuple[np.ndarray, int]:
+    """Dekodiert Formate, die soundfile/audioread nicht lesen koennen (z.B. AAC-in-M4A,
+    Opus-in-WebM von Mobile-/Browser-Recordern). PyAV bringt eigene ffmpeg-Libs im Wheel
+    mit, braucht also anders als audioreads ffmpeg-Fallback keinen System-ffmpeg-Binary."""
+    container = av.open(path)
+    try:
+        stream = container.streams.audio[0]
+        sr = stream.codec_context.sample_rate
+        resampler = av.AudioResampler(format="fltp", layout="mono", rate=sr)
+        chunks = [
+            rframe.to_ndarray()
+            for frame in container.decode(stream)
+            for rframe in resampler.resample(frame)
+        ]
+    finally:
+        container.close()
+
+    if not chunks:
+        raise ValueError("PyAV hat keine Audio-Frames dekodiert.")
+    y = np.concatenate(chunks, axis=1)[0].astype(np.float32)
+    return y, sr
 
 
 def analyze_pitch(
@@ -51,10 +75,13 @@ def analyze_pitch(
 
         try:
             y, sr = librosa.load(tmp_path, sr=None, mono=True)
-        except Exception as exc:
-            raise PitchAnalysisError(
-                f"Audiodatei konnte nicht dekodiert werden (Format nicht unterstuetzt?): {exc}"
-            ) from exc
+        except Exception:
+            try:
+                y, sr = _load_with_pyav(tmp_path)
+            except Exception as exc:
+                raise PitchAnalysisError(
+                    f"Audiodatei konnte nicht dekodiert werden (Format nicht unterstuetzt?): {exc}"
+                ) from exc
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)

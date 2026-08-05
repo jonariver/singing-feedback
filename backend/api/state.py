@@ -41,5 +41,13 @@ class _SessionStore:
             return entry[0] if entry is not None else default
 
 
-# Ein einziger Prozess, ein Nutzer lokal - ein modulweiter Store reicht fuer die MVP-Phase.
+# Ein modulweiter, threading.Lock-geschuetzter Store reicht fuer die MVP-Phase - er ist
+# sicher fuer nebenlaeufige Requests *innerhalb eines einzigen Prozesses* (z.B. via
+# FastAPIs Threadpool fuer synchrone Routen). Wichtiger Constraint, sobald das Backend
+# gehostet statt nur lokal betrieben wird: NICHT mit mehreren Worker-Prozessen starten
+# (z.B. "uvicorn --workers N") oder hinter mehreren Instanzen ohne Sticky Sessions -
+# eine in Prozess A erzeugte session_id waere fuer Prozess B unsichtbar und wuerde zu
+# verwirrenden 404s auf /track-curve bzw. /audio/analyze-Folgecalls fuehren. Persistenz
+# ueber mehrere Worker hinweg (z.B. Redis) waere die Loesung, widerspraeche aber dem
+# bewussten No-DB-Prinzip - bleibt also eine spaetere Entscheidung, kein aktueller Bug.
 MIDI_SESSIONS = _SessionStore()

@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from backend.config import MAX_AUDIO_SECONDS, PITCH_FMAX_HZ, PITCH_FMIN_HZ
 from backend.midi_analysis import list_track_candidates, load_midi, track_pitch_curve
 from backend.pitch_detection import PitchAnalysisError, analyze_pitch
 
+from .rate_limit import enforce_upload_rate_limit
 from .state import MIDI_SESSIONS
 
 router = APIRouter(prefix="/api")
@@ -23,9 +24,27 @@ MAX_MIDI_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB, MIDI-Dateien sind winzig
 MAX_AUDIO_UPLOAD_BYTES = 40 * 1024 * 1024  # grosszuegig fuer 20-60s unkomprimiertes WAV
 
 
-@router.post("/midi/upload")
-async def upload_midi(file: UploadFile = File(...)) -> dict:
-    data = await file.read()
+def _reject_oversized_content_length(request: Request, max_bytes: int) -> None:
+    """Verwirft offensichtlich zu grosse Uploads anhand des Content-Length-Headers,
+    bevor der komplette Body in den Speicher gelesen wird. Kein Ersatz fuer die
+    Pruefung der tatsaechlichen Groesse nach dem Lesen (Header ist nicht faelschungssicher
+    z.B. bei Chunked Transfer Encoding), sondern eine billige Vorabbremse fuer den
+    haeufigen Fall eines regulaer angegebenen, zu grossen Bodys."""
+    content_length = request.headers.get("content-length")
+    if content_length is None:
+        return
+    try:
+        declared_bytes = int(content_length)
+    except ValueError:
+        return
+    if declared_bytes > max_bytes:
+        raise HTTPException(status_code=413, detail="Datei ist unerwartet gross.")
+
+
+@router.post("/midi/upload", dependencies=[Depends(enforce_upload_rate_limit)])
+def upload_midi(request: Request, file: UploadFile = File(...)) -> dict:
+    _reject_oversized_content_length(request, MAX_MIDI_UPLOAD_BYTES)
+    data = file.file.read()
     if len(data) > MAX_MIDI_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="MIDI-Datei ist unerwartet gross.")
 
@@ -67,9 +86,10 @@ async def clear_midi_session(session_id: str) -> dict:
     return {"ok": True}
 
 
-@router.post("/audio/analyze")
-async def analyze_audio(file: UploadFile = File(...)) -> dict:
-    data = await file.read()
+@router.post("/audio/analyze", dependencies=[Depends(enforce_upload_rate_limit)])
+def analyze_audio(request: Request, file: UploadFile = File(...)) -> dict:
+    _reject_oversized_content_length(request, MAX_AUDIO_UPLOAD_BYTES)
+    data = file.file.read()
     if len(data) > MAX_AUDIO_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Audiodatei ist unerwartet gross.")
 

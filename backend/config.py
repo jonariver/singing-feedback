@@ -12,8 +12,24 @@ load_dotenv(PROJECT_ROOT / ".env")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
+# Komma-getrennte Liste erlaubter Origins fuers CORS, z.B. wenn das Backend
+# gehostet und von einer Mobile-App oder einem separat gehosteten Frontend
+# aus angesprochen wird. Leer = keine Cross-Origin-Requests erlaubt (Default,
+# passt zum lokalen Same-Origin-Betrieb via run.py).
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 # Kurze Ausschnitte zuerst (siehe Plan): 20-60s.
 MAX_AUDIO_SECONDS = 90
+
+# Rate-Limiting fuer die Upload-Endpunkte (siehe api/rate_limit.py): ohne Nutzerkonten/Auth
+# sind Upload-Groessenlimits + ein simples Zeitfenster-Limit pro Client-IP die einzigen
+# praktikablen Missbrauchsbremsen, sobald das Backend nicht mehr nur auf localhost laeuft.
+RATE_LIMIT_MAX_REQUESTS = int(os.environ.get("RATE_LIMIT_MAX_REQUESTS", "20"))
+RATE_LIMIT_WINDOW_SECONDS = float(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
 
 # Plausibler menschlicher Gesangsumfang fuer Pitch-Erkennung (Phase 1: fixe Grenzen,
 # spaetere Phasen koennten das je nach erkannter MIDI-Spur enger fassen).
