@@ -1,5 +1,5 @@
-"""Synchronisation von Gesangsaufnahme und MIDI-Referenz (DTW).
+"""Synchronisation von Gesangsaufnahme und Zielmelodie (DTW, Phase 3)."""
 
-Wird ab Phase 3 implementiert (siehe Plan). Phase 1 vergleicht beide Kurven noch
-ueber die rohe absolute Zeitachse, ohne Ausrichtung.
-"""
+from .features import onset_envelope_from_midi_track, onset_envelope_from_signal
+
+__all__ = ["onset_envelope_from_midi_track", "onset_envelope_from_signal"]
