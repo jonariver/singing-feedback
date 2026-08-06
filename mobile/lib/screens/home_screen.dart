@@ -122,7 +122,7 @@ class HomeScreen extends StatelessWidget {
               width: double.infinity,
               child: PitchChart(
                 targetCurve: session.displayedTargetCurve,
-                sungCurve: session.sungCurve,
+                sungCurve: session.displayedSungCurve,
               ),
             ),
           ],

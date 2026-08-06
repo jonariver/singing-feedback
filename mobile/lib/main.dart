@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'api/api_client.dart';
 import 'api/audio_api.dart';
 import 'api/midi_api.dart';
+import 'api/sync_api.dart';
 import 'screens/home_screen.dart';
 import 'state/session_state.dart';
 
@@ -22,6 +23,7 @@ class SingingFeedbackApp extends StatelessWidget {
       create: (_) => SessionState(
         midiApi: MidiApi(apiClient),
         audioApi: AudioApi(apiClient),
+        syncApi: SyncApi(apiClient),
       ),
       child: MaterialApp(
         title: 'Singing Feedback',

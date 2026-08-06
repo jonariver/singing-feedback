@@ -60,6 +60,8 @@ class _PitchChartPainter extends CustomPainter {
   static const _gridColor = Color(0x339CA3AF);
   static const _labelColor = Color(0xFF9CA3AF);
 
+  static double _sungDisplayT(SungPoint p) => p.alignedT ?? p.t;
+
   @override
   void paint(Canvas canvas, Size size) {
     final targetNotes =
@@ -83,7 +85,7 @@ class _PitchChartPainter extends CustomPainter {
 
     final maxTime = [
       targetCurve.isNotEmpty ? targetCurve.last.t : 0.0,
-      sungCurve.isNotEmpty ? sungCurve.last.t : 0.0,
+      sungCurve.isNotEmpty ? _sungDisplayT(sungCurve.last) : 0.0,
       1.0,
     ].reduce(math.max);
     final minNote = allNotes.reduce(math.min).floor() - 2;
@@ -128,7 +130,7 @@ class _PitchChartPainter extends CustomPainter {
     );
     _drawCurve(
       canvas,
-      sungCurve.map((p) => _CurvePoint(p.t, p.voiced ? p.hz : null)).toList(),
+      sungCurve.map((p) => _CurvePoint(_sungDisplayT(p), p.voiced ? p.hz : null)).toList(),
       xForT,
       yForNote,
       _sungColor,
