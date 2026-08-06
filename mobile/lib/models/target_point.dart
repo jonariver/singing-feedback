@@ -14,4 +14,6 @@ class TargetPoint {
       midiNote: json['midi_note'] as int?,
     );
   }
+
+  Map<String, dynamic> toJson() => {'t': t, 'hz': hz, 'midi_note': midiNote};
 }

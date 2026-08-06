@@ -82,4 +82,13 @@ class ApiClient {
     final response = await http.Response.fromStream(streamedResponse);
     return _decode(response);
   }
+
+  Future<Map<String, dynamic>> postJson(String path, Map<String, dynamic> body) async {
+    final response = await _http.post(
+      _uri(path),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    return _decode(response);
+  }
 }

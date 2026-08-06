@@ -28,4 +28,12 @@ class SungPoint {
       alignedT: (json['aligned_t'] as num?)?.toDouble(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        't': t,
+        'hz': hz,
+        'voiced': voiced,
+        'confidence': confidence,
+        'aligned_t': alignedT,
+      };
 }
