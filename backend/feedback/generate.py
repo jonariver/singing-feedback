@@ -18,6 +18,15 @@ class FeedbackUnavailableError(Exception):
     """API-Key fehlt oder der Anthropic-Aufruf ist fehlgeschlagen."""
 
 
+# Stabile, generische Fehlermeldung fuer alles, was via routes.py::feedback() als
+# HTTP-Detail beim Client landet - nie die rohe Exception (kann englische JSON-
+# Fehlertexte des Anthropic-SDK enthalten) oder interne Konfigurationsnamen wie den
+# Env-Var-Namen durchreichen ("der Fehler wird nicht verschluckt, aber auch keine
+# Stacktrace-Details an den Client durchgereicht"). Die eigentliche Ursache bleibt
+# ueber "from exc" fuer Server-seitige Diagnose in __cause__ erhalten.
+_UNAVAILABLE_MESSAGE = "Feedback ist derzeit nicht verfügbar. Bitte später erneut versuchen."
+
+
 def generate_feedback(
     score_result: dict,
     messages_client_factory: Callable[[], Any] | None = None,
@@ -32,7 +41,7 @@ def generate_feedback(
         return {"points": []}
 
     if not ANTHROPIC_API_KEY:
-        raise FeedbackUnavailableError("ANTHROPIC_API_KEY ist nicht konfiguriert.")
+        raise FeedbackUnavailableError(_UNAVAILABLE_MESSAGE)
 
     if messages_client_factory is None:
         messages_client_factory = lambda: anthropic.Anthropic(api_key=ANTHROPIC_API_KEY).messages
@@ -46,7 +55,7 @@ def generate_feedback(
             messages_client_factory(), ANTHROPIC_MODEL, prompt_text, catalog_ids(catalog)
         )
     except Exception as exc:
-        raise FeedbackUnavailableError(f"Anthropic-Aufruf fehlgeschlagen: {exc}") from exc
+        raise FeedbackUnavailableError(_UNAVAILABLE_MESSAGE) from exc
 
     points = []
     for raw in raw_points[:3]:

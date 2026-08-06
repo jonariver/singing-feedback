@@ -4,6 +4,14 @@ Messwert (harte Zahlen aus context) von der Aufgabe an Claude (siehe build_promp
 
 from __future__ import annotations
 
+# Deckelt die Anzahl der in den Prompt aufgenommenen auffaelligen Noten, unabhaengig
+# davon, wie viele Noten score_result mitbringt. Ohne diese Grenze koennte ein
+# Aufrufer (der /api/feedback-Endpoint prueft nur die Gesamtgroesse des Requests,
+# nicht die Notenzahl) mit einem grossen, synthetischen score-Dict einen beliebig
+# grossen, voll kostenpflichtigen Anthropic-Prompt erzwingen. Claude braucht ohnehin
+# nur genug Problem-Noten, um bis zu 3 Punkte abzuleiten.
+_MAX_FLAGGED_NOTES_IN_PROMPT = 50
+
 
 def build_prompt_context(score_result: dict) -> dict:
     """Extrahiert die Summary-Zahlen plus eine kompakte Liste der auffaelligen Noten
@@ -32,7 +40,7 @@ def build_prompt_context(score_result: dict) -> dict:
                 "phrase_end_drift_flag": note["phrase_end_drift"]["flag"],
                 "phrase_end_drift_direction": note["phrase_end_drift"]["direction"],
             })
-    return {"summary": summary, "flagged_notes": flagged_notes}
+    return {"summary": summary, "flagged_notes": flagged_notes[:_MAX_FLAGGED_NOTES_IN_PROMPT]}
 
 
 def build_prompt_text(context: dict) -> str:

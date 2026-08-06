@@ -48,6 +48,7 @@ class _FakeApiClient extends ApiClient {
   }
 
   Object? throwOnFeedback;
+  int feedbackCallCount = 0;
   Map<String, dynamic> feedbackResponse = {
     'feedback': {
       'points': [
@@ -65,6 +66,7 @@ class _FakeApiClient extends ApiClient {
   Future<Map<String, dynamic>> postJson(String path, Map<String, dynamic> body) async {
     lastPostJsonBody = body;
     if (path == '/api/feedback') {
+      feedbackCallCount++;
       if (throwOnFeedback != null) throw throwOnFeedback!;
       return feedbackResponse;
     }
@@ -472,6 +474,28 @@ void main() {
 
     expect(session.feedbackStatus, LoadStatus.error);
     expect(session.feedbackMessage, contains('Feedback nicht verfuegbar'));
+  });
+
+  test('requestFeedback() verhindert Doppel-Tap: zwei parallele Aufrufe loesen nur einen HTTP-Call aus', () async {
+    final client = _FakeApiClient();
+    final session = SessionState(
+      midiApi: MidiApi(client),
+      audioApi: AudioApi(client),
+      syncApi: SyncApi(client),
+      scoreApi: ScoreApi(client),
+      feedbackApi: FeedbackApi(client),
+    );
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    await session.score();
+
+    final first = session.requestFeedback();
+    final second = session.requestFeedback();
+    await Future.wait([first, second]);
+
+    expect(client.feedbackCallCount, 1);
+    expect(session.feedbackStatus, LoadStatus.ok);
   });
 
   test('requestFeedback() ohne scoreResult tut nichts', () async {

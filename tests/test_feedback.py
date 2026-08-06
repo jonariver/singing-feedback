@@ -126,6 +126,12 @@ def test_build_prompt_text_says_keine_when_no_flagged_notes():
     assert "- keine" in text
 
 
+def test_build_prompt_context_caps_flagged_notes_at_50():
+    notes = [_note(i, missed=True) for i in range(60)]
+    context = build_prompt_context(_score_result(notes))
+    assert len(context["flagged_notes"]) == 50
+
+
 class _FakeMessagesClient:
     def __init__(self, points=None, raise_error=None):
         self._points = points if points is not None else []

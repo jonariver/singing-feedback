@@ -269,6 +269,11 @@ class SessionState extends ChangeNotifier {
   /// Auto-Trigger wie bei align()/score() - jeder Aufruf loest eine echte,
   /// kostenpflichtige Anthropic-API-Anfrage aus.
   Future<void> requestFeedback() async {
+    // Synchroner Guard vor dem ersten await: verhindert, dass ein schneller
+    // Doppel-Tap (innerhalb des Frames, bevor der disabled-Zustand des Buttons
+    // sichtbar wird) zwei parallele, beide kostenpflichtige Anthropic-Aufrufe
+    // ausloest - gleiches Muster wie PlaybackButton/ShareButton.
+    if (feedbackStatus == LoadStatus.loading) return;
     if (scoreResult == null) return;
     feedbackStatus = LoadStatus.loading;
     feedbackMessage = 'Hole Feedback…';
