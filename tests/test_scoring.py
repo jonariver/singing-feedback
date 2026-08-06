@@ -358,13 +358,16 @@ def test_score_performance_single_correct_note():
 
 def test_score_performance_includes_sung_t_from_first_attributed_frame():
     target_curve = _flat_curve(440.0, 100)  # eine Note, 0.0s-1.0s
+    # Raw t is offset by 5.0s from aligned_t to distinguish the two fields.
+    # aligned_t falls in the note's [0.0, 1.0) window so frames are attributed;
+    # sung_t must read raw t (not aligned_t) to catch field-mixup bugs.
     sung_curve = [
-        {"t": round(i * 0.01, 3), "hz": 440.0, "voiced": True, "confidence": 0.9,
+        {"t": round(i * 0.01 + 5.0, 3), "hz": 440.0, "voiced": True, "confidence": 0.9,
          "aligned_t": round(i * 0.01, 3)}
         for i in range(50)
     ]
     score = score_performance(target_curve, sung_curve)
-    assert score["notes"][0]["sung_t"] == pytest.approx(0.0)
+    assert score["notes"][0]["sung_t"] == pytest.approx(5.0)
 
 
 def test_score_performance_sung_t_is_none_when_note_has_no_attributed_frames():
