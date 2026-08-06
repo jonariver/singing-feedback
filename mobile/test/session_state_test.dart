@@ -6,6 +6,7 @@ import 'package:singing_feedback_mobile/api/api_client.dart';
 import 'package:singing_feedback_mobile/api/audio_api.dart';
 import 'package:singing_feedback_mobile/api/midi_api.dart';
 import 'package:singing_feedback_mobile/api/score_api.dart';
+import 'package:singing_feedback_mobile/api/feedback_api.dart';
 import 'package:singing_feedback_mobile/api/sync_api.dart';
 import 'package:singing_feedback_mobile/models/target_point.dart';
 import 'package:singing_feedback_mobile/state/session_state.dart';
@@ -46,9 +47,27 @@ class _FakeApiClient extends ApiClient {
     };
   }
 
+  Object? throwOnFeedback;
+  Map<String, dynamic> feedbackResponse = {
+    'feedback': {
+      'points': [
+        {
+          'problem': 'Timing daneben',
+          'technik': 'Testtechnik',
+          'uebung': 'Testuebung',
+          'wiederholungsaufgabe': null,
+        },
+      ],
+    },
+  };
+
   @override
   Future<Map<String, dynamic>> postJson(String path, Map<String, dynamic> body) async {
     lastPostJsonBody = body;
+    if (path == '/api/feedback') {
+      if (throwOnFeedback != null) throw throwOnFeedback!;
+      return feedbackResponse;
+    }
     return {
       'score': {
         'notes': [
@@ -83,6 +102,7 @@ SessionState _buildSession() {
     audioApi: AudioApi(client),
     syncApi: SyncApi(client),
     scoreApi: ScoreApi(client),
+    feedbackApi: FeedbackApi(client),
   );
 }
 
@@ -360,6 +380,7 @@ void main() {
       audioApi: AudioApi(client),
       syncApi: SyncApi(client),
       scoreApi: ScoreApi(client),
+      feedbackApi: FeedbackApi(client),
     );
     session.setReferenceSource(ReferenceSource.recording);
     await session.analyzeReference(Uint8List.fromList([9, 9, 9]), 'referenz.wav');
@@ -417,5 +438,60 @@ void main() {
     session.setReferenceSource(ReferenceSource.recording);
 
     expect(session.sungAudioFilename, isNull);
+  });
+
+  test('requestFeedback() setzt feedbackResult nach erfolgreichem Aufruf', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    await session.score();
+
+    await session.requestFeedback();
+
+    expect(session.feedbackStatus, LoadStatus.ok);
+    expect(session.feedbackResult, isNotNull);
+    expect(session.feedbackResult!.points.first.problem, 'Timing daneben');
+  });
+
+  test('requestFeedback() setzt feedbackStatus auf error, wenn der Aufruf fehlschlaegt', () async {
+    final client = _FakeApiClient()..throwOnFeedback = ApiException(503, 'Feedback nicht verfuegbar.');
+    final session = SessionState(
+      midiApi: MidiApi(client),
+      audioApi: AudioApi(client),
+      syncApi: SyncApi(client),
+      scoreApi: ScoreApi(client),
+      feedbackApi: FeedbackApi(client),
+    );
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    await session.score();
+
+    await session.requestFeedback();
+
+    expect(session.feedbackStatus, LoadStatus.error);
+    expect(session.feedbackMessage, contains('Feedback nicht verfuegbar'));
+  });
+
+  test('requestFeedback() ohne scoreResult tut nichts', () async {
+    final session = _buildSession();
+    await session.requestFeedback();
+    expect(session.feedbackStatus, LoadStatus.idle);
+  });
+
+  test('ein erneutes score() setzt ein zuvor geholtes feedbackResult zurueck', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    await session.score();
+    await session.requestFeedback();
+    expect(session.feedbackResult, isNotNull);
+
+    await session.score();
+
+    expect(session.feedbackResult, isNull);
+    expect(session.feedbackStatus, LoadStatus.idle);
   });
 }

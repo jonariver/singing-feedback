@@ -71,6 +71,30 @@ class ScoreNote {
       driftDirection: drift['direction'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'index': index,
+        'start_t': startT,
+        'end_t': endT,
+        'target_hz': targetHz,
+        'target_midi_note': targetMidiNote,
+        'missed': missed,
+        'coverage_fraction': coverageFraction,
+        'cents_deviation': {'value': centsValue, 'classification': centsClassification},
+        'timing': {'deviation_ms': timingDeviationMs, 'classification': timingClassification},
+        'held': held,
+        'stability': {
+          'applicable': stabilityApplicable,
+          'mad_cents': stabilityMadCents,
+          'flag': stabilityFlag,
+        },
+        'phrase_end_drift': {
+          'applicable': driftApplicable,
+          'drift_cents': driftCents,
+          'flag': phraseEndDriftFlag,
+          'direction': driftDirection,
+        },
+      };
 }
 
 class ScoreSummary {
@@ -110,6 +134,19 @@ class ScoreSummary {
         overallScore: (json['overall_score'] as num).toDouble(),
         problemTags: (json['problem_tags'] as List).cast<String>(),
       );
+
+  Map<String, dynamic> toJson() => {
+        'note_count': noteCount,
+        'missed_count': missedCount,
+        'cents_green': centsGreen,
+        'cents_yellow': centsYellow,
+        'cents_red': centsRed,
+        'timing_flagged_count': timingFlaggedCount,
+        'stability_flagged_count': stabilityFlaggedCount,
+        'phrase_end_drift_flagged_count': phraseEndDriftFlaggedCount,
+        'overall_score': overallScore,
+        'problem_tags': problemTags,
+      };
 }
 
 class ScoreResult {
@@ -125,4 +162,9 @@ class ScoreResult {
             .toList(),
         summary: ScoreSummary.fromJson(json['summary'] as Map<String, dynamic>),
       );
+
+  Map<String, dynamic> toJson() => {
+        'notes': notes.map((n) => n.toJson()).toList(),
+        'summary': summary.toJson(),
+      };
 }

@@ -6,6 +6,8 @@ import '../api/api_client.dart';
 import '../api/audio_api.dart';
 import '../api/midi_api.dart';
 import '../api/score_api.dart';
+import '../api/feedback_api.dart';
+import '../models/feedback_result.dart';
 import '../api/sync_api.dart';
 import '../models/score_result.dart';
 import '../models/sung_point.dart';
@@ -23,12 +25,14 @@ class SessionState extends ChangeNotifier {
   final AudioApi audioApi;
   final SyncApi syncApi;
   final ScoreApi scoreApi;
+  final FeedbackApi feedbackApi;
 
   SessionState({
     required this.midiApi,
     required this.audioApi,
     required this.syncApi,
     required this.scoreApi,
+    required this.feedbackApi,
   });
 
   String? midiSessionId;
@@ -59,6 +63,10 @@ class SessionState extends ChangeNotifier {
   ScoreResult? scoreResult;
   LoadStatus scoreStatus = LoadStatus.idle;
   String scoreMessage = '';
+
+  FeedbackResult? feedbackResult;
+  LoadStatus feedbackStatus = LoadStatus.idle;
+  String feedbackMessage = '';
 
   /// Die fuer den Chart zu zeichnende gesungene Kurve: ausgerichtet, sobald ein
   /// Alignment vorliegt, sonst (noch nicht fertig oder fehlgeschlagen) die rohe
@@ -238,6 +246,9 @@ class SessionState extends ChangeNotifier {
   /// widersprechen sie sich sichtbar.
   Future<void> score() async {
     if (alignedSungCurve.isEmpty) return;
+    feedbackResult = null;
+    feedbackStatus = LoadStatus.idle;
+    feedbackMessage = '';
     scoreStatus = LoadStatus.loading;
     scoreMessage = 'Werte Aufnahme aus…';
     notifyListeners();
@@ -249,6 +260,26 @@ class SessionState extends ChangeNotifier {
     } catch (e) {
       scoreStatus = LoadStatus.error;
       scoreMessage = 'Bewertung fehlgeschlagen: ${_messageOf(e)}';
+    }
+    notifyListeners();
+  }
+
+  /// Fordert Claude-generiertes Feedback zur aktuellen Bewertung an (POST
+  /// /api/feedback). Nur auf Nutzer-Wunsch (Button in HomeScreen), kein
+  /// Auto-Trigger wie bei align()/score() - jeder Aufruf loest eine echte,
+  /// kostenpflichtige Anthropic-API-Anfrage aus.
+  Future<void> requestFeedback() async {
+    if (scoreResult == null) return;
+    feedbackStatus = LoadStatus.loading;
+    feedbackMessage = 'Hole Feedback…';
+    notifyListeners();
+    try {
+      feedbackResult = await feedbackApi.requestFeedback(scoreResult!.toJson());
+      feedbackStatus = LoadStatus.ok;
+      feedbackMessage = 'Feedback fertig.';
+    } catch (e) {
+      feedbackStatus = LoadStatus.error;
+      feedbackMessage = 'Feedback fehlgeschlagen: ${_messageOf(e)}';
     }
     notifyListeners();
   }
@@ -307,6 +338,9 @@ class SessionState extends ChangeNotifier {
     scoreResult = null;
     scoreStatus = LoadStatus.idle;
     scoreMessage = '';
+    feedbackResult = null;
+    feedbackStatus = LoadStatus.idle;
+    feedbackMessage = '';
   }
 
   String _messageOf(Object e) => e is ApiException ? e.message : e.toString();
