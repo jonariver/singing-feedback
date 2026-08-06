@@ -137,6 +137,13 @@ class SessionState extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    // Wurde noch nie tatsaechlich abgespielt (Controller nie gebaut), gibt es per
+    // Definition nichts zu stoppen - fruehzeitig raus, BEVOR der (lazy gebaute)
+    // _playbackController-Getter angefasst wird. Sonst wuerde z.B. setReferenceSource()
+    // (das stop() unbedingt aufruft) in jedem Test/Aufruf einen echten AudioPlayer()
+    // samt Plattform-Kanal-Zugriff anstossen, selbst wenn nie etwas lief (siehe
+    // Kommentar am _playbackController-Getter oben).
+    if (_playbackControllerInstance == null) return;
     final generation = _playbackGeneration = Object();
     await _playbackController.stop();
     if (generation != _playbackGeneration) return;
@@ -427,6 +434,13 @@ class SessionState extends ChangeNotifier {
 
   void setReferenceSource(ReferenceSource source) {
     if (source == referenceSource) return;
+    // Der geteilte Player (siehe Klassenkommentar oben) koennte gerade Referenz- oder
+    // Gesangsbytes abspielen - beide werden durch den Moduswechsel gleich behandelt
+    // (sungAudioBytes unten zurueckgesetzt, referenceAudioBytes bleibt zwar erhalten,
+    // aber der zugehoerige PlaybackButton verschwindet aus dem Baum). Ohne diesen
+    // Stop wuerde eine laufende Wiedergabe unsichtbar (kein Icon im Baum kann sie mehr
+    // stoppen) und unbegrenzt weiterlaufen.
+    unawaited(stop());
     referenceSource = source;
     sungCurve = [];
     sungAudioBytes = null;

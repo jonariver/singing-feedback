@@ -58,6 +58,12 @@ def load_audio_signal(
 
     Die Audiodatei wird nur in einer temporaeren Datei zwischengehalten und danach
     sofort geloescht - keine dauerhafte Speicherung (siehe Datenschutz-Leitplanke).
+
+    ACHTUNG: Der Anfang des dekodierten Signals wird hier NICHT getrimmt/verschoben
+    (nur das Ende wird bei max_seconds gekappt). Das Feature "Sprung zur Zeitstelle
+    in der Aufnahme" (Mobile-Feedback-Karten) setzt genau darauf: sungCurve.t
+    entspricht 1:1 der Abspielposition in denselben Rohbytes. Wird hier je Start-
+    Trimming/Offset eingefuehrt, bricht dieses Feature still.
     """
     if not audio_bytes:
         raise AudioDecodeError("Keine Audiodaten empfangen.")

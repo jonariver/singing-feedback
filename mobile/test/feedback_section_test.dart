@@ -41,6 +41,7 @@ class _FakePlaybackController implements AudioPlaybackController {
   int playFromCallCount = 0;
   Uint8List? lastPlayFromBytes;
   Duration? lastPlayFromPosition;
+  Object? throwOnPlayFrom;
 
   @override
   Future<void> play(Uint8List bytes) async {}
@@ -50,6 +51,7 @@ class _FakePlaybackController implements AudioPlaybackController {
     playFromCallCount++;
     lastPlayFromBytes = bytes;
     lastPlayFromPosition = position;
+    if (throwOnPlayFrom != null) throw throwOnPlayFrom!;
   }
 
   @override
@@ -242,6 +244,61 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fakePlayback.lastPlayFromPosition, Duration.zero);
+    });
+
+    testWidgets(
+        'eine fehlgeschlagene Sprung-Anfrage bleibt nicht ueber eine neue '
+        'Feedback-Runde hinweg an der gleichlautenden Kartenposition stehen '
+        '(Regression: stale error + fehlender Key erlaubten State-Wiederverwendung)',
+        (tester) async {
+      final fakePlayback = _FakePlaybackController()
+        ..throwOnPlayFrom = Exception('Geraetefehler');
+      final client = _FakeApiClient()
+        ..feedbackResponse = {
+          'feedback': {
+            'points': [
+              {
+                'problem': 'Erste Runde',
+                'technik': 'T1', 'uebung': 'U1',
+                'wiederholungsaufgabe': null, 'jump_to_t': 5.0,
+              },
+            ],
+          },
+        };
+      final audioBytes = Uint8List.fromList([1, 2, 3]);
+      final session = _buildSession(client, fakePlayback: fakePlayback)
+        ..scoreResult = _dummyScoreResult()
+        ..sungAudioBytes = audioBytes;
+      await tester.pumpWidget(_wrap(session));
+
+      await tester.tap(find.text('Feedback anfordern'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.play_circle_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Sprung fehlgeschlagen'), findsOneWidget);
+
+      // Neue Feedback-Runde: gleiche Listenposition (Index 0), aber ein voellig
+      // neues FeedbackPoint-Objekt mit anderem Inhalt - der alte Fehler darf hier
+      // nicht mehr auftauchen.
+      fakePlayback.throwOnPlayFrom = null;
+      client.feedbackResponse = {
+        'feedback': {
+          'points': [
+            {
+              'problem': 'Zweite Runde',
+              'technik': 'T2', 'uebung': 'U2',
+              'wiederholungsaufgabe': null, 'jump_to_t': 3.0,
+            },
+          ],
+        },
+      };
+
+      await tester.tap(find.text('Feedback anfordern'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Zweite Runde'), findsOneWidget);
+      expect(find.textContaining('Sprung fehlgeschlagen'), findsNothing);
     });
   });
 }

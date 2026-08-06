@@ -41,7 +41,7 @@ class FeedbackSection extends StatelessWidget {
           ),
         if (session.feedbackResult != null)
           for (final point in session.feedbackResult!.points)
-            _FeedbackPointCard(point: point, session: session),
+            _FeedbackPointCard(key: ValueKey(point), point: point, session: session),
       ],
     );
   }
@@ -51,7 +51,7 @@ class _FeedbackPointCard extends StatefulWidget {
   final FeedbackPoint point;
   final SessionState session;
 
-  const _FeedbackPointCard({required this.point, required this.session});
+  const _FeedbackPointCard({super.key, required this.point, required this.session});
 
   @override
   State<_FeedbackPointCard> createState() => _FeedbackPointCardState();
@@ -70,7 +70,10 @@ class _FeedbackPointCardState extends State<_FeedbackPointCard> {
     final jumpToT = widget.point.jumpToT;
     final audioBytes = widget.session.sungAudioBytes;
     if (_isBusy || jumpToT == null || audioBytes == null) return;
-    setState(() => _isBusy = true);
+    setState(() {
+      _isBusy = true;
+      _errorMessage = null;
+    });
     try {
       final startSeconds = jumpToT - 0.5 < 0 ? 0.0 : jumpToT - 0.5;
       await widget.session.playFrom(

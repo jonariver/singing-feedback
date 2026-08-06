@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -97,6 +98,54 @@ class _FakeApiClient extends ApiClient {
   }
 }
 
+/// Fake-Implementierung von [AudioPlaybackController] fuer Tests, ganz ohne echten
+/// Plattform-Kanal - gleiches Muster wie in playback_button_test.dart. [play]/
+/// [playFrom]/[pause]/[stop] koennen ueber die jeweiligen Completer auf "haengend"
+/// gehalten werden, um Await-Race-Szenarien (Generation-Guard) zu simulieren.
+class _FakePlaybackController implements AudioPlaybackController {
+  Completer<void>? playCompleter;
+  Completer<void>? playFromCompleter;
+  Completer<void>? pauseCompleter;
+  Completer<void>? stopCompleter;
+  int playCallCount = 0;
+  int playFromCallCount = 0;
+  int pauseCallCount = 0;
+  int stopCallCount = 0;
+  final _completeController = StreamController<void>.broadcast();
+
+  @override
+  Future<void> play(Uint8List bytes) async {
+    playCallCount++;
+    if (playCompleter != null) await playCompleter!.future;
+  }
+
+  @override
+  Future<void> playFrom(Uint8List bytes, Duration position) async {
+    playFromCallCount++;
+    if (playFromCompleter != null) await playFromCompleter!.future;
+  }
+
+  @override
+  Future<void> pause() async {
+    pauseCallCount++;
+    if (pauseCompleter != null) await pauseCompleter!.future;
+  }
+
+  @override
+  Future<void> stop() async {
+    stopCallCount++;
+    if (stopCompleter != null) await stopCompleter!.future;
+  }
+
+  @override
+  Stream<void> get onComplete => _completeController.stream;
+
+  @override
+  void dispose() {
+    unawaited(_completeController.close());
+  }
+}
+
 SessionState _buildSession() {
   final client = _FakeApiClient();
   return SessionState(
@@ -105,6 +154,18 @@ SessionState _buildSession() {
     syncApi: SyncApi(client),
     scoreApi: ScoreApi(client),
     feedbackApi: FeedbackApi(client),
+  );
+}
+
+SessionState _buildSessionWithPlayback(AudioPlaybackController fake) {
+  final client = _FakeApiClient();
+  return SessionState(
+    midiApi: MidiApi(client),
+    audioApi: AudioApi(client),
+    syncApi: SyncApi(client),
+    scoreApi: ScoreApi(client),
+    feedbackApi: FeedbackApi(client),
+    playbackControllerFactory: () => fake,
   );
 }
 
@@ -517,5 +578,88 @@ void main() {
 
     expect(session.feedbackResult, isNull);
     expect(session.feedbackStatus, LoadStatus.idle);
+  });
+
+  group('SessionState geteilter Player (play/playFrom/pause/stop)', () {
+    test('play() setzt isPlaying nach Abschluss auf true', () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await session.play(bytes);
+
+      expect(session.isPlaying, isTrue);
+      expect(fake.playCallCount, 1);
+    });
+
+    test('pause() setzt isPlaying nach Abschluss auf false', () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      await session.play(Uint8List.fromList([1, 2, 3]));
+      expect(session.isPlaying, isTrue);
+
+      await session.pause();
+
+      expect(session.isPlaying, isFalse);
+      expect(fake.pauseCallCount, 1);
+    });
+
+    test(
+        'Generation-Guard: eine erst spaeter aufloesende play()-Zusage darf einen '
+        'zwischenzeitlich per stop() gesetzten Zustand nicht mehr rueckwirkend '
+        'ueberschreiben (Ausloese-Reihenfolge zaehlt, nicht Abschluss-Reihenfolge)',
+        () async {
+      final fake = _FakePlaybackController()..playCompleter = Completer<void>();
+      final session = _buildSessionWithPlayback(fake);
+      final bytesA = Uint8List.fromList([1, 2, 3]);
+
+      // play() wird ausgeloest, haengt aber in fake.play() fest (Completer offen).
+      final firstCall = session.play(bytesA);
+
+      // stop() wird SPAETER ausgeloest, loest aber SCHNELLER auf (kein Completer).
+      await session.stop();
+      expect(session.isPlaying, isFalse);
+      expect(session.isPlayingAudio(bytesA), isFalse);
+      expect(fake.stopCallCount, 1);
+
+      // Jetzt loest die veraltete play()-Zusage nachtraeglich auf.
+      fake.playCompleter!.complete();
+      await firstCall;
+
+      // Der Generation-Guard muss verhindern, dass die veraltete play()-Ausloesung
+      // den durch das spaeter ausgeloeste (aber frueher fertige) stop() gesetzten
+      // Zustand rueckwirkend ueberschreibt.
+      expect(session.isPlaying, isFalse);
+      expect(session.isPlayingAudio(bytesA), isFalse);
+    });
+
+    test('isPlayingAudio prueft Objekt-Identitaet, nicht Byteinhalt', () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytesA = Uint8List.fromList([1, 2, 3]);
+      final bytesASameContent = Uint8List.fromList([1, 2, 3]);
+
+      await session.play(bytesA);
+
+      expect(session.isPlayingAudio(bytesA), isTrue);
+      expect(session.isPlayingAudio(bytesASameContent), isFalse);
+      expect(session.isPlayingAudio(null), isFalse);
+    });
+
+    test(
+        'setReferenceSource() stoppt eine laufende Wiedergabe des geteilten Players '
+        '(sonst spielt sie nach dem Wechsel unsichtbar unbegrenzt weiter, Regression)',
+        () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      await session.play(Uint8List.fromList([1, 2, 3]));
+      expect(session.isPlaying, isTrue);
+
+      session.setReferenceSource(ReferenceSource.recording);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fake.stopCallCount, 1);
+      expect(session.isPlaying, isFalse);
+    });
   });
 }
