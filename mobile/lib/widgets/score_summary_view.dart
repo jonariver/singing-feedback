@@ -16,14 +16,23 @@ class ScoreSummaryView extends StatelessWidget {
         _ => Colors.red.shade300,
       };
 
+  String _classificationSymbol(String classification) => switch (classification) {
+        'green' => '●',
+        'yellow' => '▲',
+        _ => '■',
+      };
+
   String _noteLabel(ScoreNote note) {
-    final parts = <String>[
-      note.centsValue == null ? '–¢' : '${note.centsValue!.toStringAsFixed(0)}¢',
-    ];
+    final symbol = _classificationSymbol(note.centsClassification);
+    final centsText = note.centsValue == null ? '–¢' : '${note.centsValue!.toStringAsFixed(0)}¢';
+    final parts = <String>['$symbol $centsText'];
     if (note.timingClassification != 'on_time') {
       parts.add(note.timingClassification == 'too_early' ? 'zu früh' : 'zu spät');
     }
-    if (note.phraseEndDriftFlag) parts.add('Phrasenende driftet');
+    if (note.phraseEndDriftFlag) {
+      final direction = note.driftDirection == 'up' ? 'steigt an' : 'sackt ab';
+      parts.add('Phrasenende $direction');
+    }
     if (note.stabilityFlag) parts.add('instabil');
     if (note.missed) parts.add('verfehlt');
     return 'Note ${note.index + 1}: ${parts.join(' · ')}';

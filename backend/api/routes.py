@@ -13,7 +13,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from pydantic import BaseModel
 
 from backend.audio_io import AudioDecodeError, load_audio_signal
-from backend.config import MAX_AUDIO_SECONDS, MAX_SCORE_CURVE_FRAMES, PITCH_FMAX_HZ, PITCH_FMIN_HZ
+from backend.config import (
+    MAX_AUDIO_SECONDS,
+    MAX_SCORE_CURVE_FRAMES,
+    MAX_SCORE_REQUEST_BYTES,
+    PITCH_FMAX_HZ,
+    PITCH_FMIN_HZ,
+)
 from backend.midi_analysis import list_track_candidates, load_midi, track_pitch_curve
 from backend.pitch_detection import PitchAnalysisError, analyze_pitch, pitch_curve_from_signal
 from backend.scoring import score_performance
@@ -190,12 +196,16 @@ class ScoreRequest(BaseModel):
     sung_curve: list[dict]  # muss die AUSGERICHTETE Kurve sein (aligned_t vorhanden)
 
 
-@router.post("/score")
-def score(body: ScoreRequest) -> dict:
+@router.post("/score", dependencies=[Depends(enforce_upload_rate_limit)])
+def score(request: Request, body: ScoreRequest) -> dict:
+    _reject_oversized_content_length(request, MAX_SCORE_REQUEST_BYTES)
     if len(body.target_curve) > MAX_SCORE_CURVE_FRAMES or len(body.sung_curve) > MAX_SCORE_CURVE_FRAMES:
         raise HTTPException(status_code=413, detail="Kurve ist unerwartet lang.")
     try:
         result = score_performance(body.target_curve, body.sung_curve)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Kurvendaten sind unvollständig oder ungültig.",
+        ) from exc
     return {"score": result}

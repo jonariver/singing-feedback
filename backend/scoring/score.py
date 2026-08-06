@@ -39,7 +39,9 @@ def score_performance(
         missed = is_missed(coverage, cents_value)
 
         onset_ms = compute_onset_deviation_ms(sung_curve, note)
-        timing_classification = classify_timing(onset_ms) if onset_ms is not None else "on_time"
+        timing_classification = "on_time"
+        if not missed and onset_ms is not None:
+            timing_classification = classify_timing(onset_ms)
 
         stability = compute_stability(note, attributed)
         drift = compute_phrase_end_drift(note, attributed)

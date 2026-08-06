@@ -56,6 +56,7 @@ def compute_coverage_fraction(note: dict, attributed_frames: list[dict], frame_r
         if not frame.get("voiced") or frame.get("hz") is None:
             continue
         bucket = round((frame["aligned_t"] - note["start_t"]) / step)
+        bucket = max(0, min(bucket, expected_buckets - 1))
         covered_buckets.add(bucket)
     return min(1.0, len(covered_buckets) / expected_buckets)
 

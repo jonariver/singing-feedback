@@ -132,11 +132,13 @@ class SessionState extends ChangeNotifier {
     if (referenceSource == ReferenceSource.recording) {
       referenceTransposeSemitones = semitones;
       notifyListeners();
+      if (alignedSungCurve.isNotEmpty) await score();
       return;
     }
     if (selectedTrackIndex == null) return;
     transposeSemitones = semitones;
     await _reloadTargetCurve();
+    if (alignedSungCurve.isNotEmpty) await score();
   }
 
   Future<void> _reloadTargetCurve() async {
@@ -225,20 +227,20 @@ class SessionState extends ChangeNotifier {
   }
 
   /// Bewertet die ausgerichtete Gesangskurve gegen die Zielmelodie (POST /api/score).
-  /// Wird automatisch am Ende eines erfolgreichen align() angestossen - kein
-  /// manueller Button, gleiches Prinzip wie align() nach analyzeAudio(). Nutzt
-  /// bewusst NICHT displayedTargetCurve (im Referenz-Modus clientseitig transponiert
-  /// fuer die Chart-Anzeige) - das Backend hat beim Alignment die UNTRANSPONIERTE
-  /// referenceRawCurve gesehen, score() muss also dieselbe Kurve verwenden.
+  /// Wird automatisch am Ende eines erfolgreichen align() angestossen und erneut nach
+  /// jeder Transpose-Aenderung (siehe setTranspose) - kein manueller Button. Nutzt
+  /// displayedTargetCurve (die auch im Chart gezeigte, ggf. transponierte Kurve): DTW-
+  /// Alignment selbst haengt nie von Transpose ab (laeuft nur auf der Onset-Huellkurve,
+  /// nie auf Tonhoehe), aber die Bewertung IST tonhoehen-abhaengig - Chart und Bewertung
+  /// muessen dieselbe (ggf. transponierte) Zielkurve zeigen bzw. bewerten, sonst
+  /// widersprechen sie sich sichtbar.
   Future<void> score() async {
     if (alignedSungCurve.isEmpty) return;
     scoreStatus = LoadStatus.loading;
     scoreMessage = 'Werte Aufnahme aus…';
     notifyListeners();
     try {
-      final targetCurveJson = referenceSource == ReferenceSource.midi
-          ? targetCurve.map((p) => p.toJson()).toList()
-          : referenceRawCurve.map((p) => p.toJson()).toList();
+      final targetCurveJson = displayedTargetCurve.map((p) => p.toJson()).toList();
       scoreResult = await scoreApi.score(targetCurveJson, alignedSungCurve);
       scoreStatus = LoadStatus.ok;
       scoreMessage = 'Bewertung fertig.';

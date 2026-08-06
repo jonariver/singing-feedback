@@ -352,8 +352,8 @@ void main() {
   });
 
   test(
-      'score() sendet im Referenz-Modus die UNTRANSPONIERTE referenceRawCurve, '
-      'nicht die transponierte Anzeigekurve', () async {
+      'score() sendet im Referenz-Modus die TRANSPONIERTE Anzeigekurve, '
+      'damit Chart und Bewertung uebereinstimmen', () async {
     final client = _FakeApiClient();
     final session = SessionState(
       midiApi: MidiApi(client),
@@ -364,18 +364,33 @@ void main() {
     session.setReferenceSource(ReferenceSource.recording);
     await session.analyzeReference(Uint8List.fromList([9, 9, 9]), 'referenz.wav');
     // Referenzkurve hat laut _FakeApiClient.postMultipart hz=440.0 fuer den ersten Frame.
-    // Ein von Null verschiedener Transpose macht displayedTargetCurve (transponiert)
-    // zahlenmaessig verschieden von referenceRawCurve (unveraendert) - genau das,
-    // was dieser Test unterscheiden muss.
     await session.setTranspose(12);
 
     await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
 
     final sentTargetCurve = client.lastPostJsonBody!['target_curve'] as List;
     final firstFrameHz = (sentTargetCurve[0] as Map)['hz'] as num;
-    // referenceRawCurve (unveraendert): 440.0. displayedTargetCurve waere mit +12
-    // Halbtoenen transponiert: 440.0 * 2^(12/12) = 880.0. Wuerde score() faelschlich
-    // displayedTargetCurve senden, waere firstFrameHz hier 880.0 statt 440.0.
-    expect(firstFrameHz, closeTo(440.0, 0.01));
+    // displayedTargetCurve ist mit +12 Halbtoenen transponiert: 440.0 * 2^(12/12) = 880.0.
+    // Wuerde score() faelschlich die unveraenderte referenceRawCurve senden, waere
+    // firstFrameHz hier 440.0 statt 880.0.
+    expect(firstFrameHz, closeTo(880.0, 0.01));
+  });
+
+  test('setTranspose loest im MIDI-Modus nach einem erfolgreichen Alignment ein '
+      'erneutes score() aus', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    expect(session.scoreResult, isNotNull);
+
+    // getTrackCurve() ist im Fake nicht abgedeckt (nur postMultipart/postJson), daher
+    // schlaegt der Reload selbst fehl - relevant ist hier nur, dass score() danach
+    // trotzdem erneut versucht wird (alignedSungCurve ist zu diesem Zeitpunkt noch
+    // von der vorherigen Aufnahme befuellt).
+    await session.setTranspose(5);
+
+    expect(session.scoreStatus, isNot(LoadStatus.idle));
   });
 }

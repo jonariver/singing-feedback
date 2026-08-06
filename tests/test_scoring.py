@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from backend.config import MISSED_NOTE_MIN_COVERAGE_FRACTION
 from backend.scoring.notes import attribute_sung_frames, hz_to_cents, segment_target_notes
 from backend.scoring.pitch import (
     classify_cents,
@@ -154,6 +155,25 @@ def test_compute_coverage_fraction_no_voiced_frames():
     assert compute_coverage_fraction(note, []) == 0.0
 
 
+def test_compute_coverage_fraction_ignores_tail_content_past_note_end():
+    # Note ist komplett still (0.0-0.3s), aber danach (ab 0.3s, im LAST_NOTE_TAIL_
+    # TOLERANCE_SECONDS-Fenster einer letzten Note) wird woanders weitergesungen -
+    # das darf nicht als (nahezu) volle Abdeckung dieser Note durchgehen. Ohne den
+    # Bucket-Clamp waeren hier 20 verschiedene Buckets (30..49) betroffen und die
+    # Abdeckung wuerde auf min(1.0, 20/30) ~= 0.67 aufgeblaeht ("volle Abdeckung
+    # vortaeuschen"). Mit dem Clamp faellt jeder dieser Frames auf denselben letzten
+    # gueltigen Bucket (29, durch Floating-Point-Rundung von 0.3/0.01) zurueck, was
+    # die Abdeckung auf maximal einen einzelnen Bucket (1/30 ~= 0.03) begrenzt - weit
+    # unter der is_missed()-Mindestabdeckung von 0.5, die Note bleibt also korrekt
+    # als verfehlt erkannt (die urspruengliche, ungeklammerte Version haette hier
+    # faelschlich coverage_fraction > MISSED_NOTE_MIN_COVERAGE_FRACTION liefern koennen).
+    note = {"start_t": 0.0, "end_t": 0.3}
+    frames = [_sung_frame(round(0.3 + i * 0.01, 3), 440.0, aligned_t=round(0.3 + i * 0.01, 3)) for i in range(20)]
+    coverage = compute_coverage_fraction(note, frames)
+    assert coverage < MISSED_NOTE_MIN_COVERAGE_FRACTION
+    assert is_missed(coverage, cents_value=None) is True
+
+
 def test_is_missed_flags_low_coverage():
     assert is_missed(coverage_fraction=0.3, cents_value=0.0) is True
     assert is_missed(coverage_fraction=0.8, cents_value=0.0) is False
@@ -268,6 +288,20 @@ def test_compute_stability_excludes_tail_even_when_tail_dominates_frame_count():
     assert stability["mad_cents"] < 5.0
 
 
+def test_compute_stability_flags_genuine_instability():
+    # Gehaltene Note (0.9s), Hauptteil wackelt staendig zwischen +/-40 Cent (echte
+    # Instabilitaet, kein monotoner Drift) - muss stability.flag = True ergeben.
+    note = {"start_t": 0.0, "end_t": 0.9, "hz": 440.0}
+    frames = []
+    for i in range(50):
+        cents = 40.0 if i % 2 == 0 else -40.0
+        hz = 440.0 * 2 ** (cents / 1200.0)
+        frames.append(_sung_frame(round(0.05 + i * 0.01, 3), hz, aligned_t=round(0.05 + i * 0.01, 3)))
+    result = compute_stability(note, frames)
+    assert result["applicable"] is True
+    assert result["flag"] is True
+
+
 from backend.scoring import score_performance
 
 
@@ -283,6 +317,26 @@ def test_score_performance_empty_curves_returns_empty_result():
     assert result["notes"] == []
     assert result["summary"]["note_count"] == 0
     assert result["summary"]["problem_tags"] == []
+
+
+def test_score_performance_does_not_timing_flag_a_missed_note():
+    target_curve = _flat_curve(440.0, 100)  # eine Note, 1.0s, C4-artig
+    # Komplett stille "Gesangs"-Kurve fuer denselben Zeitraum, aber woanders (bei
+    # t=5.0s) taucht zufaellig ein stimmhafter Frame auf, der frueher versehentlich
+    # als "Timing-Treffer" fuer diese Note herangezogen worden waere.
+    sung_curve = [
+        {"t": round(i * 0.01, 3), "hz": None, "voiced": False, "confidence": 0.0,
+         "aligned_t": round(i * 0.01, 3)}
+        for i in range(100)
+    ] + [
+        {"t": 5.0, "hz": 440.0, "voiced": True, "confidence": 0.9, "aligned_t": 5.0},
+    ]
+    result = score_performance(target_curve, sung_curve)
+    note = result["notes"][0]
+    assert note["missed"] is True
+    assert note["timing"]["classification"] == "on_time"
+    assert result["summary"]["timing_flagged_count"] == 0
+    assert "timingprobleme" not in result["summary"]["problem_tags"]
 
 
 def test_score_performance_single_correct_note():

@@ -56,6 +56,7 @@ STABILITY_ONSET_TRIM_SECONDS = 0.05
 # Bewertungs-Engine: Timing (fruehe/spaete Einsaetze).
 TIMING_ONSET_WINDOW_FRAMES = 5
 TIMING_OK_THRESHOLD_MS = 60.0
+TIMING_MAX_SEARCH_SECONDS = 1.0
 
 # Bewertungs-Engine: Stabilitaet & Phrasenend-Drift bei gehaltenen Toenen.
 HELD_NOTE_MIN_DURATION_SECONDS = 0.6
@@ -67,3 +68,5 @@ DRIFT_FLAG_THRESHOLD_CENTS = 30.0
 # hier nicht automatisch, da ein Client theoretisch ein ueberlanges JSON-Array direkt
 # posten koennte, ohne ueber /api/audio/analyze bzw. /api/sync/align gegangen zu sein).
 MAX_SCORE_CURVE_FRAMES = 20000  # ~200s bei 100Hz, grosszuegig ueber MAX_AUDIO_SECONDS
+
+MAX_SCORE_REQUEST_BYTES = 20 * 1024 * 1024  # grosszuegig ueber dem realistischen JSON-Volumen bei MAX_SCORE_CURVE_FRAMES
