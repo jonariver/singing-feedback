@@ -22,6 +22,7 @@ from backend.config import (
 )
 from backend.midi_analysis import list_track_candidates, load_midi, track_pitch_curve
 from backend.pitch_detection import PitchAnalysisError, analyze_pitch, pitch_curve_from_signal
+from backend.feedback import FeedbackUnavailableError, generate_feedback
 from backend.scoring import score_performance
 from backend.sync import (
     align_curves,
@@ -209,3 +210,22 @@ def score(request: Request, body: ScoreRequest) -> dict:
             detail="Kurvendaten sind unvollständig oder ungültig.",
         ) from exc
     return {"score": result}
+
+
+class FeedbackRequest(BaseModel):
+    score: dict  # ScoreResult, wie von /api/score unter "score" zurueckgegeben
+
+
+@router.post("/feedback", dependencies=[Depends(enforce_upload_rate_limit)])
+def feedback(request: Request, body: FeedbackRequest) -> dict:
+    _reject_oversized_content_length(request, MAX_SCORE_REQUEST_BYTES)
+    try:
+        result = generate_feedback(body.score)
+    except FeedbackUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (KeyError, TypeError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="score-Daten sind unvollständig oder ungültig.",
+        ) from exc
+    return {"feedback": result}
