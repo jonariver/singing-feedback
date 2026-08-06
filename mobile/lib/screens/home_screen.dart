@@ -133,6 +133,13 @@ class HomeScreen extends StatelessWidget {
               child: PitchChart(
                 targetCurve: session.displayedTargetCurve,
                 sungCurve: session.displayedSungCurve,
+                noteColorRanges: session.scoreResult?.notes
+                    .map((n) => NoteColorRange(
+                          startT: n.startT,
+                          endT: n.endT,
+                          classification: n.centsClassification,
+                        ))
+                    .toList(),
               ),
             ),
             const Divider(height: 32),

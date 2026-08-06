@@ -6,6 +6,13 @@ import '../models/sung_point.dart';
 import '../models/target_point.dart';
 
 const _noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const _targetColor = Color(0xFF00C2CB);
+const _sungColor = Color(0xFFEA580C);
+
+// Spiegelt backend/config.py::LAST_NOTE_TAIL_TOLERANCE_SECONDS, damit die
+// Chart-Faerbung der letzten Note exakt mit der Backend-Zuordnung in
+// backend/scoring/notes.py::attribute_sung_frames uebereinstimmt.
+const double _lastNoteTailToleranceSeconds = 0.3;
 
 double _hzToMidiNote(double hz) => 69 + 12 * (math.log(hz / 440) / math.ln2);
 
@@ -13,6 +20,43 @@ String _midiNoteName(int n) {
   final name = _noteNames[((n % 12) + 12) % 12];
   final octave = (n / 12).floor() - 1;
   return '$name$octave';
+}
+
+/// Zeitspanne einer bewerteten Note mit ihrer Cent-Klassifizierung, gebaut aus
+/// ScoreNote (siehe models/score_result.dart) fuer die Kurvenfaerbung in
+/// PitchChart. Bewusst kein Modell in models/, da keine JSON-(De-)Serialisierung
+/// noetig ist - reine Darstellungs-Hilfsklasse.
+class NoteColorRange {
+  final double startT;
+  final double endT;
+  final String classification; // 'green' | 'yellow' | 'red'
+
+  const NoteColorRange({required this.startT, required this.endT, required this.classification});
+}
+
+Color _classificationColor(String classification) => switch (classification) {
+      'green' => Colors.green.shade300,
+      'yellow' => Colors.amber.shade300,
+      'red' => Colors.red.shade300,
+      _ => _sungColor,
+    };
+
+/// Ermittelt die Kurvenfarbe fuer einen Ist-Kurven-Punkt anhand seiner Zeit t
+/// (bereits aligned_t ?? t) und der Notenspannen aus der Bewertung. Reine, von
+/// Canvas/CustomPainter entkoppelte Funktion, direkt unit-testbar (siehe
+/// pitch_chart_test.dart). Liegt t in keiner Spanne (davor, danach ausserhalb
+/// der Toleranz, oder keine/leere Liste), gilt die Fallback-Farbe _sungColor.
+Color colorForSungPoint(double t, List<NoteColorRange>? ranges) {
+  if (ranges == null) return _sungColor;
+  for (var i = 0; i < ranges.length; i++) {
+    final range = ranges[i];
+    final isLast = i == ranges.length - 1;
+    final effectiveEndT = isLast ? range.endT + _lastNoteTailToleranceSeconds : range.endT;
+    if (t >= range.startT && t < effectiveEndT) {
+      return _classificationColor(range.classification);
+    }
+  }
+  return _sungColor;
 }
 
 class _CurvePoint {
@@ -29,8 +73,14 @@ class _CurvePoint {
 class PitchChart extends StatelessWidget {
   final List<TargetPoint> targetCurve;
   final List<SungPoint> sungCurve;
+  final List<NoteColorRange>? noteColorRanges;
 
-  const PitchChart({super.key, required this.targetCurve, required this.sungCurve});
+  const PitchChart({
+    super.key,
+    required this.targetCurve,
+    required this.sungCurve,
+    this.noteColorRanges,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +88,11 @@ class PitchChart extends StatelessWidget {
       builder: (context, constraints) {
         return CustomPaint(
           size: Size(constraints.maxWidth, constraints.maxHeight),
-          painter: _PitchChartPainter(targetCurve: targetCurve, sungCurve: sungCurve),
+          painter: _PitchChartPainter(
+            targetCurve: targetCurve,
+            sungCurve: sungCurve,
+            noteColorRanges: noteColorRanges,
+          ),
         );
       },
     );
@@ -48,15 +102,18 @@ class PitchChart extends StatelessWidget {
 class _PitchChartPainter extends CustomPainter {
   final List<TargetPoint> targetCurve;
   final List<SungPoint> sungCurve;
+  final List<NoteColorRange>? noteColorRanges;
 
-  _PitchChartPainter({required this.targetCurve, required this.sungCurve});
+  _PitchChartPainter({
+    required this.targetCurve,
+    required this.sungCurve,
+    this.noteColorRanges,
+  });
 
   static const double _padLeft = 46;
   static const double _padRight = 12;
   static const double _padTop = 12;
   static const double _padBottom = 28;
-  static const _targetColor = Color(0xFF00C2CB);
-  static const _sungColor = Color(0xFFEA580C);
   static const _gridColor = Color(0x339CA3AF);
   static const _labelColor = Color(0xFF9CA3AF);
 
@@ -134,6 +191,7 @@ class _PitchChartPainter extends CustomPainter {
       xForT,
       yForNote,
       _sungColor,
+      noteColorRanges: noteColorRanges,
     );
   }
 
@@ -156,34 +214,57 @@ class _PitchChartPainter extends CustomPainter {
     List<_CurvePoint> points,
     double Function(double) xForT,
     double Function(double) yForNote,
-    Color color,
-  ) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
+    Color defaultColor, {
+    List<NoteColorRange>? noteColorRanges,
+  }) {
+    Path? currentPath;
+    Color? currentColor;
+    Offset? lastOffset;
 
-    final path = Path();
-    bool drawing = false;
+    void flush() {
+      if (currentPath != null && currentColor != null) {
+        canvas.drawPath(
+          currentPath!,
+          Paint()
+            ..color = currentColor!
+            ..strokeWidth = 2
+            ..style = PaintingStyle.stroke,
+        );
+      }
+      currentPath = null;
+      currentColor = null;
+    }
+
     for (final p in points) {
       if (p.hz == null) {
-        drawing = false;
+        flush();
+        lastOffset = null;
         continue;
       }
-      final x = xForT(p.t);
-      final y = yForNote(_hzToMidiNote(p.hz!));
-      if (!drawing) {
-        path.moveTo(x, y);
-        drawing = true;
+      final offset = Offset(xForT(p.t), yForNote(_hzToMidiNote(p.hz!)));
+      final color = noteColorRanges == null ? defaultColor : colorForSungPoint(p.t, noteColorRanges);
+
+      if (currentPath == null) {
+        currentPath = Path()..moveTo(offset.dx, offset.dy);
+        currentColor = color;
+      } else if (color != currentColor) {
+        flush();
+        currentPath = Path()
+          ..moveTo(lastOffset!.dx, lastOffset!.dy)
+          ..lineTo(offset.dx, offset.dy);
+        currentColor = color;
       } else {
-        path.lineTo(x, y);
+        currentPath!.lineTo(offset.dx, offset.dy);
       }
+      lastOffset = offset;
     }
-    canvas.drawPath(path, paint);
+    flush();
   }
 
   @override
   bool shouldRepaint(covariant _PitchChartPainter oldDelegate) {
-    return oldDelegate.targetCurve != targetCurve || oldDelegate.sungCurve != sungCurve;
+    return oldDelegate.targetCurve != targetCurve ||
+        oldDelegate.sungCurve != sungCurve ||
+        oldDelegate.noteColorRanges != noteColorRanges;
   }
 }
