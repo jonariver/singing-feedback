@@ -1,5 +1,2 @@
-"""Claude-Feedback: strukturierte Analysewerte -> max. 3 priorisierte Verbesserungspunkte.
-
-Wird ab Phase 6 implementiert (siehe Plan). Ruft die Anthropic API ausschliesslich
-serverseitig auf (Key aus backend/config.py, nie im Frontend).
-"""
+"""Claude-generiertes Feedback (Phase 6): siehe generate.py fuer den Orchestrator,
+der von backend/api/routes.py aufgerufen wird."""
