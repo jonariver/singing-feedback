@@ -189,3 +189,53 @@ def test_compute_onset_deviation_ms_recovers_offset():
 def test_compute_onset_deviation_ms_none_without_voiced_frames():
     note = {"start_t": 2.0, "end_t": 3.0}
     assert compute_onset_deviation_ms([], note) is None
+
+
+from backend.scoring.stability import compute_phrase_end_drift, compute_stability, is_held_note
+
+
+def test_is_held_note():
+    assert is_held_note({"start_t": 0.0, "end_t": 0.6}) is True
+    assert is_held_note({"start_t": 0.0, "end_t": 0.59}) is False
+
+
+def test_compute_stability_not_applicable_for_short_note():
+    note = {"start_t": 0.0, "end_t": 0.3, "hz": 440.0}
+    result = compute_stability(note, [])
+    assert result["applicable"] is False
+
+
+def test_compute_phrase_end_drift_flags_tail_drop():
+    note = {"start_t": 3.0, "end_t": 4.2, "hz": 329.628}
+    frames = [
+        _sung_frame(round(3.0 + i * 0.01, 3), 329.628, aligned_t=round(3.0 + i * 0.01, 3))
+        for i in range(90)
+    ]
+    frames += [
+        _sung_frame(
+            round(3.9 + i * 0.01, 3),
+            329.628 * 2 ** (-100 * (i / 30) / 1200),
+            aligned_t=round(3.9 + i * 0.01, 3),
+        )
+        for i in range(30)
+    ]
+    result = compute_phrase_end_drift(note, frames)
+    assert result["applicable"] is True
+    assert result["flag"] is True
+    assert result["direction"] == "down"
+
+
+def test_compute_stability_and_drift_ignore_constant_offset():
+    # Konstante -40 Cent ueber die ganze Note - kein Drift (Hauptteil und Ende
+    # sind gleich weit daneben), auch keine Instabilitaet (Streuung im Hauptteil
+    # bleibt klein).
+    note = {"start_t": 1.0, "end_t": 2.0, "hz": 329.628}
+    offset_hz = 329.628 * 2 ** (-40 / 1200)
+    frames = [
+        _sung_frame(round(1.0 + i * 0.01, 3), offset_hz, aligned_t=round(1.0 + i * 0.01, 3))
+        for i in range(100)
+    ]
+    stability = compute_stability(note, frames)
+    drift = compute_phrase_end_drift(note, frames)
+    assert stability["flag"] is False
+    assert drift["flag"] is False

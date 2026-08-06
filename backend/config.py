@@ -56,3 +56,9 @@ STABILITY_ONSET_TRIM_SECONDS = 0.05
 # Bewertungs-Engine: Timing (fruehe/spaete Einsaetze).
 TIMING_ONSET_WINDOW_FRAMES = 5
 TIMING_OK_THRESHOLD_MS = 60.0
+
+# Bewertungs-Engine: Stabilitaet & Phrasenend-Drift bei gehaltenen Toenen.
+HELD_NOTE_MIN_DURATION_SECONDS = 0.6
+STABILITY_MAD_THRESHOLD_CENTS = 25.0
+DRIFT_TAIL_SECONDS = 0.3
+DRIFT_FLAG_THRESHOLD_CENTS = 30.0
