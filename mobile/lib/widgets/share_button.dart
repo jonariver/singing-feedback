@@ -58,6 +58,14 @@ class _ShareButtonState extends State<ShareButton> {
   bool _isBusy = false;
   String? _errorMessage;
 
+  @override
+  void didUpdateWidget(covariant ShareButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.audioBytes != oldWidget.audioBytes || widget.filename != oldWidget.filename) {
+      _errorMessage = null;
+    }
+  }
+
   Future<void> _share() async {
     if (_isBusy || widget.audioBytes == null || widget.filename == null) return;
     setState(() {

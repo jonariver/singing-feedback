@@ -133,5 +133,70 @@ void main() {
 
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+        'Fehlermeldung wird geloescht, wenn audioBytes sich aendert (Regression fuer Finding 2)',
+        (tester) async {
+      final fake = _FakeShareController()..throwOnShare = Exception('Fehler beim Teilen');
+      final bytes1 = Uint8List.fromList([1, 2, 3]);
+      final bytes2 = Uint8List.fromList([4, 5, 6]);
+
+      await tester.pumpWidget(
+        _wrap(ShareButton(
+          audioBytes: bytes1,
+          filename: 'aufnahme1.m4a',
+          controllerFactory: () => fake,
+        )),
+      );
+
+      await tester.tap(find.byIcon(Icons.share));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Teilen fehlgeschlagen'), findsOneWidget);
+
+      // Neue Aufnahme mit anderen Bytes
+      await tester.pumpWidget(
+        _wrap(ShareButton(
+          audioBytes: bytes2,
+          filename: 'aufnahme2.m4a',
+          controllerFactory: () => fake,
+        )),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Teilen fehlgeschlagen'), findsNothing);
+    });
+
+    testWidgets(
+        'Fehlermeldung wird geloescht, wenn filename sich aendert (Regression fuer Finding 2)',
+        (tester) async {
+      final fake = _FakeShareController()..throwOnShare = Exception('Fehler beim Teilen');
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await tester.pumpWidget(
+        _wrap(ShareButton(
+          audioBytes: bytes,
+          filename: 'aufnahme1.m4a',
+          controllerFactory: () => fake,
+        )),
+      );
+
+      await tester.tap(find.byIcon(Icons.share));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Teilen fehlgeschlagen'), findsOneWidget);
+
+      // Gleiche Bytes, aber anderer Dateiname (z.B. Referenzquelle gewechselt)
+      await tester.pumpWidget(
+        _wrap(ShareButton(
+          audioBytes: bytes,
+          filename: 'aufnahme2.m4a',
+          controllerFactory: () => fake,
+        )),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Teilen fehlgeschlagen'), findsNothing);
+    });
   });
 }

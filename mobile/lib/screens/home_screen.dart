@@ -114,9 +114,12 @@ class HomeScreen extends StatelessWidget {
                   constraints: const BoxConstraints(maxWidth: 180),
                   child: PlaybackButton(audioBytes: session.sungAudioBytes),
                 ),
-                ShareButton(
-                  audioBytes: session.sungAudioBytes,
-                  filename: session.sungAudioFilename,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 140),
+                  child: ShareButton(
+                    audioBytes: session.sungAudioBytes,
+                    filename: session.sungAudioFilename,
+                  ),
                 ),
               ],
             ),
