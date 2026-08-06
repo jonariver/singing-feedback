@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 
 from backend.config import (
+    LAST_NOTE_TAIL_TOLERANCE_SECONDS,
     NOTE_SEGMENT_MAX_BRIDGE_GAP_FRAMES,
     NOTE_SEGMENT_MIN_DURATION_SECONDS,
     NOTE_SEGMENT_ROLLING_WINDOW_FRAMES,
@@ -103,15 +104,18 @@ def segment_target_notes(
 
 def attribute_sung_frames(sung_curve: list[dict], note: dict, is_last_note: bool) -> list[dict]:
     """Sung-Frames, deren aligned_t in [note['start_t'], note['end_t']) faellt - bei
-    der letzten Note nach oben offen, damit DTW-Randeffekte keine Frames verschlucken."""
+    der letzten Note um LAST_NOTE_TAIL_TOLERANCE_SECONDS nach oben erweitert (nicht
+    unbegrenzt offen), damit DTW-Randeffekte keine Frames verschlucken, ohne dass
+    beliebig langer Nachklang (Summen, Atmen, Ausklingen) faelschlich der letzten
+    Note zugerechnet wird."""
     start_t = note["start_t"]
     end_t = note["end_t"]
+    if is_last_note:
+        end_t = end_t + LAST_NOTE_TAIL_TOLERANCE_SECONDS
     result = []
     for frame in sung_curve:
         aligned_t = frame.get("aligned_t")
-        if aligned_t is None or aligned_t < start_t:
-            continue
-        if not is_last_note and aligned_t >= end_t:
+        if aligned_t is None or aligned_t < start_t or aligned_t >= end_t:
             continue
         result.append(frame)
     return result

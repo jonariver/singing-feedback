@@ -90,11 +90,18 @@ def test_attribute_sung_frames_respects_note_window():
     assert [f["t"] for f in attributed] == [1.2, 1.8]
 
 
-def test_attribute_sung_frames_last_note_is_open_ended():
+def test_attribute_sung_frames_last_note_has_tail_tolerance():
     note = {"index": 0, "start_t": 1.0, "end_t": 2.0, "hz": 440.0, "midi_note": 69}
-    sung_curve = [{"t": 2.5, "aligned_t": 2.5}]
+    sung_curve = [{"t": 2.2, "aligned_t": 2.2}]  # 0.2s past end, within 0.3s tolerance
     attributed = attribute_sung_frames(sung_curve, note, is_last_note=True)
-    assert [f["t"] for f in attributed] == [2.5]
+    assert [f["t"] for f in attributed] == [2.2]
+
+
+def test_attribute_sung_frames_last_note_excludes_beyond_tolerance():
+    note = {"index": 0, "start_t": 1.0, "end_t": 2.0, "hz": 440.0, "midi_note": 69}
+    sung_curve = [{"t": 2.5, "aligned_t": 2.5}]  # 0.5s past end, beyond 0.3s tolerance
+    attributed = attribute_sung_frames(sung_curve, note, is_last_note=True)
+    assert [f["t"] for f in attributed] == []
 
 
 def _sung_frame(t: float, hz: float | None, voiced: bool = True, aligned_t: float | None = None) -> dict:
