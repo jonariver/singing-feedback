@@ -62,3 +62,8 @@ HELD_NOTE_MIN_DURATION_SECONDS = 0.6
 STABILITY_MAD_THRESHOLD_CENTS = 25.0
 DRIFT_TAIL_SECONDS = 0.3
 DRIFT_FLAG_THRESHOLD_CENTS = 30.0
+
+# Groessenschutz fuer POST /api/score (kein Audio-Upload -> MAX_AUDIO_SECONDS greift
+# hier nicht automatisch, da ein Client theoretisch ein ueberlanges JSON-Array direkt
+# posten koennte, ohne ueber /api/audio/analyze bzw. /api/sync/align gegangen zu sein).
+MAX_SCORE_CURVE_FRAMES = 20000  # ~200s bei 100Hz, grosszuegig ueber MAX_AUDIO_SECONDS

@@ -10,11 +10,13 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from pydantic import BaseModel
 
 from backend.audio_io import AudioDecodeError, load_audio_signal
-from backend.config import MAX_AUDIO_SECONDS, PITCH_FMAX_HZ, PITCH_FMIN_HZ
+from backend.config import MAX_AUDIO_SECONDS, MAX_SCORE_CURVE_FRAMES, PITCH_FMAX_HZ, PITCH_FMIN_HZ
 from backend.midi_analysis import list_track_candidates, load_midi, track_pitch_curve
 from backend.pitch_detection import PitchAnalysisError, analyze_pitch, pitch_curve_from_signal
+from backend.scoring import score_performance
 from backend.sync import (
     align_curves,
     duration_ratio_exceeds_limit,
@@ -181,3 +183,19 @@ def sync_align(
 
     result = align_curves(target_curve, target_envelope, sung_curve, sung_envelope)
     return {"target_curve": target_curve, **result}
+
+
+class ScoreRequest(BaseModel):
+    target_curve: list[dict]
+    sung_curve: list[dict]  # muss die AUSGERICHTETE Kurve sein (aligned_t vorhanden)
+
+
+@router.post("/score")
+def score(body: ScoreRequest) -> dict:
+    if len(body.target_curve) > MAX_SCORE_CURVE_FRAMES or len(body.sung_curve) > MAX_SCORE_CURVE_FRAMES:
+        raise HTTPException(status_code=413, detail="Kurve ist unerwartet lang.")
+    try:
+        result = score_performance(body.target_curve, body.sung_curve)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"score": result}
