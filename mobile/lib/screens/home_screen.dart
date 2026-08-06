@@ -6,6 +6,7 @@ import '../state/session_state.dart';
 import '../widgets/pitch_chart.dart';
 import '../widgets/playback_button.dart';
 import '../widgets/recording_control.dart';
+import '../widgets/score_summary_view.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/track_candidate_card.dart';
 import '../widgets/transpose_control.dart';
@@ -126,6 +127,11 @@ class HomeScreen extends StatelessWidget {
                 sungCurve: session.displayedSungCurve,
               ),
             ),
+            const Divider(height: 32),
+            Text('4. Bewertung', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            StatusBanner(status: session.scoreStatus, message: session.scoreMessage),
+            if (session.scoreResult != null) ScoreSummaryView(result: session.scoreResult!),
           ],
         ),
       ),
