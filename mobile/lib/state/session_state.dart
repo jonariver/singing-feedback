@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import '../api/api_client.dart';
 import '../api/audio_api.dart';
 import '../api/midi_api.dart';
+import '../api/score_api.dart';
 import '../api/sync_api.dart';
+import '../models/score_result.dart';
 import '../models/sung_point.dart';
 import '../models/target_point.dart';
 import '../models/track_candidate.dart';
@@ -20,8 +22,14 @@ class SessionState extends ChangeNotifier {
   final MidiApi midiApi;
   final AudioApi audioApi;
   final SyncApi syncApi;
+  final ScoreApi scoreApi;
 
-  SessionState({required this.midiApi, required this.audioApi, required this.syncApi});
+  SessionState({
+    required this.midiApi,
+    required this.audioApi,
+    required this.syncApi,
+    required this.scoreApi,
+  });
 
   String? midiSessionId;
   List<TrackCandidate> candidates = [];
@@ -46,6 +54,10 @@ class SessionState extends ChangeNotifier {
   List<SungPoint> alignedSungCurve = [];
   LoadStatus alignStatus = LoadStatus.idle;
   String alignMessage = '';
+
+  ScoreResult? scoreResult;
+  LoadStatus scoreStatus = LoadStatus.idle;
+  String scoreMessage = '';
 
   /// Die fuer den Chart zu zeichnende gesungene Kurve: ausgerichtet, sobald ein
   /// Alignment vorliegt, sonst (noch nicht fertig oder fehlgeschlagen) die rohe
@@ -200,11 +212,39 @@ class SessionState extends ChangeNotifier {
       }
       alignStatus = LoadStatus.ok;
       alignMessage = 'Ausrichtung fertig.';
+      notifyListeners();
+      await score();
+      return;
     } catch (e) {
       alignStatus = LoadStatus.error;
       alignMessage = 'Ausrichtung fehlgeschlagen: ${_messageOf(e)}';
       // alignedSungCurve bleibt leer - displayedSungCurve faellt automatisch auf
       // die rohe sungCurve zurueck (siehe Getter oben).
+    }
+    notifyListeners();
+  }
+
+  /// Bewertet die ausgerichtete Gesangskurve gegen die Zielmelodie (POST /api/score).
+  /// Wird automatisch am Ende eines erfolgreichen align() angestossen - kein
+  /// manueller Button, gleiches Prinzip wie align() nach analyzeAudio(). Nutzt
+  /// bewusst NICHT displayedTargetCurve (im Referenz-Modus clientseitig transponiert
+  /// fuer die Chart-Anzeige) - das Backend hat beim Alignment die UNTRANSPONIERTE
+  /// referenceRawCurve gesehen, score() muss also dieselbe Kurve verwenden.
+  Future<void> score() async {
+    if (alignedSungCurve.isEmpty) return;
+    scoreStatus = LoadStatus.loading;
+    scoreMessage = 'Werte Aufnahme aus…';
+    notifyListeners();
+    try {
+      final targetCurveJson = referenceSource == ReferenceSource.midi
+          ? targetCurve.map((p) => p.toJson()).toList()
+          : referenceRawCurve.map((p) => p.toJson()).toList();
+      scoreResult = await scoreApi.score(targetCurveJson, alignedSungCurve);
+      scoreStatus = LoadStatus.ok;
+      scoreMessage = 'Bewertung fertig.';
+    } catch (e) {
+      scoreStatus = LoadStatus.error;
+      scoreMessage = 'Bewertung fehlgeschlagen: ${_messageOf(e)}';
     }
     notifyListeners();
   }
@@ -258,6 +298,9 @@ class SessionState extends ChangeNotifier {
     alignedSungCurve = [];
     alignStatus = LoadStatus.idle;
     alignMessage = '';
+    scoreResult = null;
+    scoreStatus = LoadStatus.idle;
+    scoreMessage = '';
   }
 
   String _messageOf(Object e) => e is ApiException ? e.message : e.toString();

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:singing_feedback_mobile/api/api_client.dart';
 import 'package:singing_feedback_mobile/api/audio_api.dart';
 import 'package:singing_feedback_mobile/api/midi_api.dart';
+import 'package:singing_feedback_mobile/api/score_api.dart';
 import 'package:singing_feedback_mobile/api/sync_api.dart';
 import 'package:singing_feedback_mobile/models/target_point.dart';
 import 'package:singing_feedback_mobile/state/session_state.dart';
@@ -42,6 +43,34 @@ class _FakeApiClient extends ApiClient {
       ],
     };
   }
+
+  @override
+  Future<Map<String, dynamic>> postJson(String path, Map<String, dynamic> body) async {
+    return {
+      'score': {
+        'notes': [
+          {
+            'index': 0, 'start_t': 0.0, 'end_t': 1.0,
+            'target_hz': 440.0, 'target_midi_note': 69,
+            'missed': false, 'coverage_fraction': 1.0,
+            'cents_deviation': {'value': 1.2, 'classification': 'green'},
+            'timing': {'deviation_ms': 4.0, 'classification': 'on_time'},
+            'held': true,
+            'stability': {'applicable': true, 'mad_cents': 0.8, 'flag': false},
+            'phrase_end_drift': {'applicable': true, 'drift_cents': 0.3, 'flag': false, 'direction': null},
+          },
+        ],
+        'summary': {
+          'note_count': 1, 'missed_count': 0,
+          'cents_green': 1, 'cents_yellow': 0, 'cents_red': 0,
+          'timing_flagged_count': 0, 'stability_flagged_count': 0,
+          'phrase_end_drift_flagged_count': 0,
+          'overall_score': 100.0,
+          'problem_tags': <String>[],
+        },
+      },
+    };
+  }
 }
 
 SessionState _buildSession() {
@@ -50,6 +79,7 @@ SessionState _buildSession() {
     midiApi: MidiApi(client),
     audioApi: AudioApi(client),
     syncApi: SyncApi(client),
+    scoreApi: ScoreApi(client),
   );
 }
 
@@ -262,5 +292,59 @@ void main() {
 
     expect(session.alignedSungCurve, isEmpty);
     expect(session.alignStatus, LoadStatus.idle);
+  });
+
+  test('align() loest automatisch score() aus und befuellt scoreResult (MIDI-Modus)',
+      () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
+
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+
+    expect(session.scoreStatus, LoadStatus.ok);
+    expect(session.scoreResult, isNotNull);
+    expect(session.scoreResult!.notes.length, 1);
+    expect(session.scoreResult!.summary.overallScore, closeTo(100.0, 0.001));
+  });
+
+  test('align() loest score() im Referenz-Modus mit referenceRawCurve aus', () async {
+    final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.recording);
+    await session.analyzeReference(Uint8List.fromList([9, 9, 9]), 'referenz.wav');
+
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+
+    expect(session.scoreStatus, LoadStatus.ok);
+    expect(session.scoreResult, isNotNull);
+  });
+
+  test('setReferenceSource setzt scoreResult/scoreStatus zurueck', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    expect(session.scoreResult, isNotNull);
+
+    session.setReferenceSource(ReferenceSource.recording);
+
+    expect(session.scoreResult, isNull);
+    expect(session.scoreStatus, LoadStatus.idle);
+  });
+
+  test('selectTrack setzt scoreResult/scoreStatus zurueck (neue Zielmelodie)', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    expect(session.scoreResult, isNotNull);
+
+    await session.selectTrack(1);
+
+    expect(session.scoreResult, isNull);
+    expect(session.scoreStatus, LoadStatus.idle);
   });
 }
