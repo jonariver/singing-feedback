@@ -242,6 +242,7 @@ def test_generate_feedback_enriches_points_with_catalog_text(monkeypatch):
         "technik": expected_entry["technik"],
         "uebung": expected_entry["uebung"],
         "wiederholungsaufgabe": None,
+        "jump_to_t": None,
     }]
 
 
@@ -261,3 +262,56 @@ def test_generate_feedback_raises_when_anthropic_call_fails(monkeypatch):
         generate_feedback(
             _score_result_with_tags(["timingprobleme"]), messages_client_factory=lambda: fake
         )
+
+
+def test_generate_feedback_includes_jump_to_t_from_first_matching_note(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.ANTHROPIC_API_KEY", "dummy-key")
+    notes = [
+        _note(0, timing_classification="too_late", timing_deviation_ms=100.0, sung_t=5.0),
+        _note(1, timing_classification="too_late", timing_deviation_ms=120.0, sung_t=9.0),
+    ]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["timingprobleme"]
+    fake = _FakeMessagesClient(points=[{"problem": "Timing", "uebung_id": "timingprobleme"}])
+    result = generate_feedback(score_result, messages_client_factory=lambda: fake)
+    assert result["points"][0]["jump_to_t"] == 5.0
+
+
+def test_generate_feedback_skips_notes_without_sung_t_when_finding_jump_target(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.ANTHROPIC_API_KEY", "dummy-key")
+    notes = [
+        _note(0, missed=True, sung_t=None),
+        _note(1, missed=True, sung_t=7.5),
+    ]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["unsaubere_einsaetze"]
+    fake = _FakeMessagesClient(points=[{"problem": "Verfehlt", "uebung_id": "unsaubere_einsaetze"}])
+    result = generate_feedback(score_result, messages_client_factory=lambda: fake)
+    assert result["points"][0]["jump_to_t"] == 7.5
+
+
+def test_generate_feedback_gives_different_notes_to_two_points_of_the_same_category(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.ANTHROPIC_API_KEY", "dummy-key")
+    notes = [
+        _note(0, stability_flag=True, sung_t=1.0),
+        _note(1, stability_flag=True, sung_t=2.0),
+    ]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["instabile_lange_toene"]
+    fake = _FakeMessagesClient(points=[
+        {"problem": "A", "uebung_id": "instabile_lange_toene"},
+        {"problem": "B", "uebung_id": "instabile_lange_toene"},
+    ])
+    result = generate_feedback(score_result, messages_client_factory=lambda: fake)
+    assert result["points"][0]["jump_to_t"] == 1.0
+    assert result["points"][1]["jump_to_t"] == 2.0
+
+
+def test_generate_feedback_jump_to_t_is_none_when_no_note_matches(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.ANTHROPIC_API_KEY", "dummy-key")
+    notes = [_note(0, missed=True, sung_t=3.0)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["absinkende_phrasenenden"]
+    fake = _FakeMessagesClient(points=[{"problem": "X", "uebung_id": "absinkende_phrasenenden"}])
+    result = generate_feedback(score_result, messages_client_factory=lambda: fake)
+    assert result["points"][0]["jump_to_t"] is None
