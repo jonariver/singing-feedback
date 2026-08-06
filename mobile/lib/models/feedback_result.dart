@@ -5,12 +5,14 @@ class FeedbackPoint {
   final String technik;
   final String uebung;
   final String? wiederholungsaufgabe;
+  final double? jumpToT;
 
   const FeedbackPoint({
     required this.problem,
     required this.technik,
     required this.uebung,
     required this.wiederholungsaufgabe,
+    required this.jumpToT,
   });
 
   factory FeedbackPoint.fromJson(Map<String, dynamic> json) => FeedbackPoint(
@@ -18,6 +20,7 @@ class FeedbackPoint {
         technik: json['technik'] as String,
         uebung: json['uebung'] as String,
         wiederholungsaufgabe: json['wiederholungsaufgabe'] as String?,
+        jumpToT: (json['jump_to_t'] as num?)?.toDouble(),
       );
 }
 

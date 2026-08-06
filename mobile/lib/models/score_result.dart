@@ -21,6 +21,7 @@ class ScoreNote {
   final double? driftCents;
   final bool phraseEndDriftFlag;
   final String? driftDirection;
+  final double? sungT;
 
   const ScoreNote({
     required this.index,
@@ -42,6 +43,7 @@ class ScoreNote {
     required this.driftCents,
     required this.phraseEndDriftFlag,
     required this.driftDirection,
+    required this.sungT,
   });
 
   factory ScoreNote.fromJson(Map<String, dynamic> json) {
@@ -69,6 +71,7 @@ class ScoreNote {
       driftCents: (drift['drift_cents'] as num?)?.toDouble(),
       phraseEndDriftFlag: drift['flag'] as bool,
       driftDirection: drift['direction'] as String?,
+      sungT: (json['sung_t'] as num?)?.toDouble(),
     );
   }
 
@@ -94,6 +97,7 @@ class ScoreNote {
           'flag': phraseEndDriftFlag,
           'direction': driftDirection,
         },
+        'sung_t': sungT,
       };
 }
 

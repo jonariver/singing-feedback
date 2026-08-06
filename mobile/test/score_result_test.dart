@@ -10,6 +10,7 @@ Map<String, dynamic> _noteJson() => {
       'held': true,
       'stability': {'applicable': true, 'mad_cents': 0.8, 'flag': false},
       'phrase_end_drift': {'applicable': true, 'drift_cents': 0.3, 'flag': false, 'direction': null},
+      'sung_t': 0.12,
     };
 
 Map<String, dynamic> _resultJson() => {
