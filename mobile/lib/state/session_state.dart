@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 import '../api/api_client.dart';
@@ -18,6 +20,45 @@ enum LoadStatus { idle, loading, ok, error }
 
 enum ReferenceSource { midi, recording }
 
+/// Duenne Abstraktion ueber die Audio-Wiedergabe, injizierbar fuer Tests. Lebt hier
+/// (nicht mehr in playback_button.dart), weil SessionState jetzt den einen zentralen
+/// Player fuer die ganze App besitzt - PlaybackButton und die Feedback-Sprungbuttons
+/// teilen sich ihn, damit nie zwei Wiedergaben gleichzeitig laufen.
+abstract class AudioPlaybackController {
+  Future<void> play(Uint8List bytes);
+  Future<void> playFrom(Uint8List bytes, Duration position);
+  Future<void> pause();
+  Future<void> stop();
+  Stream<void> get onComplete;
+  void dispose();
+}
+
+/// Standardimplementierung, delegiert an das echte audioplayers-Paket.
+class _RealAudioPlaybackController implements AudioPlaybackController {
+  final AudioPlayer _player = AudioPlayer();
+
+  @override
+  Future<void> play(Uint8List bytes) => _player.play(BytesSource(bytes));
+
+  @override
+  Future<void> playFrom(Uint8List bytes, Duration position) =>
+      _player.play(BytesSource(bytes), position: position);
+
+  @override
+  Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> stop() => _player.stop();
+
+  @override
+  Stream<void> get onComplete => _player.onPlayerComplete;
+
+  @override
+  void dispose() {
+    unawaited(_player.dispose());
+  }
+}
+
 /// Spiegelt das `state`-Objekt aus frontend/app.js als ChangeNotifier, damit die
 /// Widgets denselben Ablauf (MIDI-Upload -> Spurwahl -> Aufnahme -> Kurven) fahren.
 class SessionState extends ChangeNotifier {
@@ -26,6 +67,7 @@ class SessionState extends ChangeNotifier {
   final SyncApi syncApi;
   final ScoreApi scoreApi;
   final FeedbackApi feedbackApi;
+  final AudioPlaybackController Function() _playbackControllerFactory;
 
   SessionState({
     required this.midiApi,
@@ -33,7 +75,82 @@ class SessionState extends ChangeNotifier {
     required this.syncApi,
     required this.scoreApi,
     required this.feedbackApi,
-  });
+    AudioPlaybackController Function()? playbackControllerFactory,
+  }) : _playbackControllerFactory =
+            playbackControllerFactory ?? (() => _RealAudioPlaybackController());
+
+  AudioPlaybackController? _playbackControllerInstance;
+  StreamSubscription<void>? _playbackCompleteSubscription;
+  bool isPlaying = false;
+  Uint8List? _playingBytes;
+  Object? _playbackGeneration;
+
+  /// Baut den Player erst beim ersten tatsaechlichen Gebrauch (nicht im Konstruktor) -
+  /// sonst wuerde jeder Test, der irgendwo eine SessionState baut, unabhaengig davon ob
+  /// er Wiedergabe ueberhaupt testet, einen echten AudioPlayer() samt unawaited
+  /// Plattform-Kanal-Aufrufen anstossen.
+  AudioPlaybackController get _playbackController {
+    var instance = _playbackControllerInstance;
+    if (instance == null) {
+      instance = _playbackControllerFactory();
+      _playbackControllerInstance = instance;
+      _playbackCompleteSubscription = instance.onComplete.listen((_) {
+        isPlaying = false;
+        notifyListeners();
+      });
+    }
+    return instance;
+  }
+
+  /// Ob genau diese Bytes (Objekt-Identitaet - reicht, da sungAudioBytes/
+  /// referenceAudioBytes stabile Referenzen sind, die nicht bei jedem Rebuild neu
+  /// erzeugt werden) gerade abgespielt werden. Damit koennen mehrere PlaybackButton-
+  /// Instanzen (Referenz- und Gesangsaufnahme) trotz gemeinsamem Player weiterhin
+  /// unabhaengig ihren eigenen Play/Pause-Icon-Status anzeigen.
+  bool isPlayingAudio(Uint8List? bytes) =>
+      isPlaying && bytes != null && identical(_playingBytes, bytes);
+
+  Future<void> play(Uint8List bytes) async {
+    final generation = _playbackGeneration = Object();
+    _playingBytes = bytes;
+    await _playbackController.play(bytes);
+    if (generation != _playbackGeneration) return;
+    isPlaying = true;
+    notifyListeners();
+  }
+
+  Future<void> playFrom(Uint8List bytes, Duration position) async {
+    final generation = _playbackGeneration = Object();
+    _playingBytes = bytes;
+    await _playbackController.playFrom(bytes, position);
+    if (generation != _playbackGeneration) return;
+    isPlaying = true;
+    notifyListeners();
+  }
+
+  Future<void> pause() async {
+    final generation = _playbackGeneration = Object();
+    await _playbackController.pause();
+    if (generation != _playbackGeneration) return;
+    isPlaying = false;
+    notifyListeners();
+  }
+
+  Future<void> stop() async {
+    final generation = _playbackGeneration = Object();
+    await _playbackController.stop();
+    if (generation != _playbackGeneration) return;
+    isPlaying = false;
+    _playingBytes = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _playbackCompleteSubscription?.cancel();
+    _playbackControllerInstance?.dispose();
+    super.dispose();
+  }
 
   String? midiSessionId;
   List<TrackCandidate> candidates = [];
