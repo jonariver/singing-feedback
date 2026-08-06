@@ -250,7 +250,7 @@ class _PitchChartPainter extends CustomPainter {
       } else if (color != currentColor) {
         flush();
         currentPath = Path()
-          ..moveTo(lastOffset!.dx, lastOffset!.dy)
+          ..moveTo(lastOffset!.dx, lastOffset.dy)
           ..lineTo(offset.dx, offset.dy);
         currentColor = color;
       } else {
