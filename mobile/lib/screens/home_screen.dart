@@ -6,6 +6,7 @@ import '../state/session_state.dart';
 import '../widgets/pitch_chart.dart';
 import '../widgets/playback_button.dart';
 import '../widgets/recording_control.dart';
+import '../widgets/feedback_section.dart';
 import '../widgets/score_summary_view.dart';
 import '../widgets/share_button.dart';
 import '../widgets/status_banner.dart';
@@ -147,6 +148,10 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 8),
             StatusBanner(status: session.scoreStatus, message: session.scoreMessage),
             if (session.scoreResult != null) ScoreSummaryView(result: session.scoreResult!),
+            const Divider(height: 32),
+            Text('5. Feedback', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            FeedbackSection(session: session),
           ],
         ),
       ),
