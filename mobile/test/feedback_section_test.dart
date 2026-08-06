@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -35,6 +37,34 @@ class _FakeApiClient extends ApiClient {
   }
 }
 
+class _FakePlaybackController implements AudioPlaybackController {
+  int playFromCallCount = 0;
+  Uint8List? lastPlayFromBytes;
+  Duration? lastPlayFromPosition;
+
+  @override
+  Future<void> play(Uint8List bytes) async {}
+
+  @override
+  Future<void> playFrom(Uint8List bytes, Duration position) async {
+    playFromCallCount++;
+    lastPlayFromBytes = bytes;
+    lastPlayFromPosition = position;
+  }
+
+  @override
+  Future<void> pause() async {}
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Stream<void> get onComplete => const Stream.empty();
+
+  @override
+  void dispose() {}
+}
+
 ScoreResult _dummyScoreResult({List<String> problemTags = const ['timingprobleme']}) {
   return ScoreResult(
     notes: const [],
@@ -53,13 +83,14 @@ ScoreResult _dummyScoreResult({List<String> problemTags = const ['timingprobleme
   );
 }
 
-SessionState _buildSession(_FakeApiClient client) {
+SessionState _buildSession(_FakeApiClient client, {AudioPlaybackController? fakePlayback}) {
   return SessionState(
     midiApi: MidiApi(client),
     audioApi: AudioApi(client),
     syncApi: SyncApi(client),
     scoreApi: ScoreApi(client),
     feedbackApi: FeedbackApi(client),
+    playbackControllerFactory: fakePlayback == null ? null : () => fakePlayback,
   );
 }
 
@@ -118,6 +149,99 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Keine besonderen Probleme erkannt.'), findsOneWidget);
+    });
+
+    testWidgets('Sprung-Button erscheint nur, wenn jumpToT gesetzt ist', (tester) async {
+      final client = _FakeApiClient()
+        ..feedbackResponse = {
+          'feedback': {
+            'points': [
+              {
+                'problem': 'Mit Zeitstelle',
+                'technik': 'T1', 'uebung': 'U1',
+                'wiederholungsaufgabe': null, 'jump_to_t': 5.0,
+              },
+              {
+                'problem': 'Ohne Zeitstelle',
+                'technik': 'T2', 'uebung': 'U2',
+                'wiederholungsaufgabe': null, 'jump_to_t': null,
+              },
+            ],
+          },
+        };
+      final session = _buildSession(client)
+        ..scoreResult = _dummyScoreResult()
+        ..sungAudioBytes = Uint8List.fromList([1, 2, 3]);
+      await tester.pumpWidget(_wrap(session));
+
+      await tester.tap(find.text('Feedback anfordern'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.play_circle_outline), findsOneWidget);
+    });
+
+    testWidgets(
+        'Tap auf den Sprung-Button spielt ab 0,5s vor der Zeitstelle ab',
+        (tester) async {
+      final fakePlayback = _FakePlaybackController();
+      final client = _FakeApiClient()
+        ..feedbackResponse = {
+          'feedback': {
+            'points': [
+              {
+                'problem': 'Timing daneben',
+                'technik': 'T1', 'uebung': 'U1',
+                'wiederholungsaufgabe': null, 'jump_to_t': 5.0,
+              },
+            ],
+          },
+        };
+      final audioBytes = Uint8List.fromList([1, 2, 3]);
+      final session = _buildSession(client, fakePlayback: fakePlayback)
+        ..scoreResult = _dummyScoreResult()
+        ..sungAudioBytes = audioBytes;
+      await tester.pumpWidget(_wrap(session));
+
+      await tester.tap(find.text('Feedback anfordern'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.play_circle_outline));
+      await tester.pumpAndSettle();
+
+      expect(fakePlayback.playFromCallCount, 1);
+      expect(fakePlayback.lastPlayFromBytes, same(audioBytes));
+      expect(fakePlayback.lastPlayFromPosition, const Duration(milliseconds: 4500));
+    });
+
+    testWidgets(
+        'Sprung bei einer Zeitstelle unter 0,5s startet bei 0 statt negativ',
+        (tester) async {
+      final fakePlayback = _FakePlaybackController();
+      final client = _FakeApiClient()
+        ..feedbackResponse = {
+          'feedback': {
+            'points': [
+              {
+                'problem': 'Ganz am Anfang',
+                'technik': 'T1', 'uebung': 'U1',
+                'wiederholungsaufgabe': null, 'jump_to_t': 0.2,
+              },
+            ],
+          },
+        };
+      final audioBytes = Uint8List.fromList([1, 2, 3]);
+      final session = _buildSession(client, fakePlayback: fakePlayback)
+        ..scoreResult = _dummyScoreResult()
+        ..sungAudioBytes = audioBytes;
+      await tester.pumpWidget(_wrap(session));
+
+      await tester.tap(find.text('Feedback anfordern'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.play_circle_outline));
+      await tester.pumpAndSettle();
+
+      expect(fakePlayback.lastPlayFromPosition, Duration.zero);
     });
   });
 }
