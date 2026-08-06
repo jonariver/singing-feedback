@@ -17,6 +17,10 @@ class _FakeApiClient extends ApiClient {
     required String fieldName,
     required Uint8List bytes,
     required String filename,
+    Map<String, String>? fields,
+    String? secondFieldName,
+    Uint8List? secondBytes,
+    String? secondFilename,
   }) async {
     return {
       'curve': [

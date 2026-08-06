@@ -61,9 +61,23 @@ class ApiClient {
     required String fieldName,
     required Uint8List bytes,
     required String filename,
+    Map<String, String>? fields,
+    String? secondFieldName,
+    Uint8List? secondBytes,
+    String? secondFilename,
   }) async {
     final request = http.MultipartRequest('POST', _uri(path));
     request.files.add(http.MultipartFile.fromBytes(fieldName, bytes, filename: filename));
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
+    if (secondFieldName != null && secondBytes != null) {
+      request.files.add(http.MultipartFile.fromBytes(
+        secondFieldName,
+        secondBytes,
+        filename: secondFilename ?? 'file',
+      ));
+    }
     final streamedResponse = await _http.send(request);
     final response = await http.Response.fromStream(streamedResponse);
     return _decode(response);
