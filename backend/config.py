@@ -35,3 +35,10 @@ RATE_LIMIT_WINDOW_SECONDS = float(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "6
 # spaetere Phasen koennten das je nach erkannter MIDI-Spur enger fassen).
 PITCH_FMIN_HZ = 65.0   # ~C2
 PITCH_FMAX_HZ = 1050.0  # ~C6
+
+# Bewertungs-Engine (Phase 4): Noten-Segmentierung aus der Zielkurve (kein
+# MIDI_SESSIONS-Zugriff, siehe Design-Spec docs/superpowers/specs/2026-08-06-scoring-engine-design.md).
+NOTE_SEGMENT_TOLERANCE_CENTS = 50.0
+NOTE_SEGMENT_ROLLING_WINDOW_FRAMES = 30
+NOTE_SEGMENT_MAX_BRIDGE_GAP_FRAMES = 15
+NOTE_SEGMENT_MIN_DURATION_SECONDS = 0.12

@@ -1,4 +1,7 @@
-"""Bewertungs-Engine: Cent-Abweichung, Timing, Stabilitaet, Drift, Glides, Pausen.
-
-Wird ab Phase 4 implementiert (siehe Plan).
+"""Bewertungs-Engine: Cent-Abweichung, verfehlte Zielnoten, Timing, Stabilitaet,
+Phrasenend-Drift (Phase 4, Kernpaket). Glides, Stimmumfang, Pausen folgen spaeter.
 """
+
+from .notes import segment_target_notes
+
+__all__ = ["segment_target_notes"]
