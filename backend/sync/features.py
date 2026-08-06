@@ -55,7 +55,7 @@ def onset_envelope_from_midi_track(
 
     env = np.zeros(n_frames)
     for note in inst.notes:
-        onset_frame = int(round(note.start / step))
+        onset_frame = int(note.start / step)
         if onset_frame >= n_frames:
             continue
         span = min(decay_frames, n_frames - onset_frame)
