@@ -7,6 +7,7 @@ import '../widgets/pitch_chart.dart';
 import '../widgets/playback_button.dart';
 import '../widgets/recording_control.dart';
 import '../widgets/score_summary_view.dart';
+import '../widgets/share_button.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/track_candidate_card.dart';
 import '../widgets/transpose_control.dart';
@@ -112,6 +113,10 @@ class HomeScreen extends StatelessWidget {
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 180),
                   child: PlaybackButton(audioBytes: session.sungAudioBytes),
+                ),
+                ShareButton(
+                  audioBytes: session.sungAudioBytes,
+                  filename: session.sungAudioFilename,
                 ),
               ],
             ),
