@@ -62,9 +62,17 @@ def align_curves(
 
     x = _zscore(target_envelope)[None, :]
     y = _zscore(sung_envelope)[None, :]
+
+    # Ein zu kurzes Kurvenpaar (< ~10 Frames je Seite) wuerde bei DTW_BAND_RADIUS=0.1 auf
+    # einen Bandradius von 0 Frames runden - librosa.sequence.dtw wirft dann
+    # ParameterError, weil das gesamte Kostengitter auf inf gesetzt wuerde (auch die
+    # Diagonale). Fuer diesen (in der Praxis extrem seltenen) Fall faellt der Aufruf auf
+    # unbegrenztes Alignment zurueck - identisch zum Verhalten vor diesem Bugfix.
+    min_len = min(len(target_envelope), len(sung_envelope))
+    band_is_usable = round(DTW_BAND_RADIUS * min_len) >= 1
+    dtw_kwargs = {"global_constraints": True, "band_rad": DTW_BAND_RADIUS} if band_is_usable else {}
     _, wp = librosa.sequence.dtw(
-        X=x, Y=y, metric="euclidean", subseq=False, backtrack=True,
-        global_constraints=True, band_rad=DTW_BAND_RADIUS,
+        X=x, Y=y, metric="euclidean", subseq=False, backtrack=True, **dtw_kwargs,
     )
 
     # wp laeuft in absteigender Reihenfolge von (len(target)-1, len(sung)-1) nach (0, 0);

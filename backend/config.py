@@ -76,6 +76,8 @@ MAX_SCORE_REQUEST_BYTES = 20 * 1024 * 1024  # grosszuegig ueber dem realistische
 # Aufnahmen mit Pausen/stillen Abschnitten (wenig Onset-Signal als Kostendruck)
 # beliebig weit "wegdriften" - real beobachtet: bis zu 18.7s Verschiebung auf einer
 # 61s-Aufnahme mit 20s Stille (siehe docs/superpowers/specs/2026-08-06-dtw-drift-band-fix-design.md).
-# Bruchteil der kuerzeren Kurvenlaenge (radius_frames = int(band_rad * min(len(X), len(Y)))),
-# skaliert also automatisch mit der Aufnahmedauer.
+# Bruchteil der kuerzeren Kurvenlaenge (radius_frames = round(band_rad * min(len(X), len(Y)))
+# per librosa.sequence.dtw), skaliert also automatisch mit der Aufnahmedauer. librosa
+# erweitert das Band zusaetzlich um |len(X) - len(Y)|, wenn die beiden Kurven
+# unterschiedlich lang sind.
 DTW_BAND_RADIUS = 0.1

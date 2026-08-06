@@ -177,3 +177,29 @@ Alignment-Zustands in `selectTrack()`/`analyzeReference()`, einen neuen
 Dauer-Verhältnis-Schutz (`duration_ratio_exceeds_limit`, Ziel darf höchstens dreimal so lang
 sein wie die Aufnahme) vor dem DTW-Aufruf in `sync_align`, und eine `StatusBanner` für
 `alignStatus`/`alignMessage` im Home-Screen.
+
+## 2026-08-06 — Bugfix: DTW-Drift bei Pausen begrenzen (Phase 3)
+
+Reale Tests auf dem Telefon deckten auf, dass `align_curves()` bei längeren Aufnahmen mit
+Pausen oder stillen Abschnitten (wenig Onset-Signal als Kostendruck) den Warping-Pfad
+beliebig weit von der Diagonale wegdriften lassen konnte — auf einer 61s-Aufnahme mit 20s
+Stille bis zu 18.7s Verschiebung.
+
+- **`41879d9` — test: reproduce DTW drift during long pauses (fails, fix follows)**
+  Neue Pausen-Fixture (durchgehende Zielspur gegen eine Gesangsspur mit echter 12s-Stille)
+  und ein Regressionstest, der den unbegrenzten Drift zunächst rot zeigt.
+- **`6e5d139` — fix: bound DTW warping path with Sakoe-Chiba band to prevent drift during
+  pauses**
+  `align_curves()` übergibt `librosa.sequence.dtw` jetzt `global_constraints=True` mit einem
+  auf `DTW_BAND_RADIUS=0.1` kalibrierten Sakoe-Chiba-Band, das den Pfad nah an der Diagonale
+  hält, ohne echte Timing-Abweichungen zu verhindern.
+
+**Abschließendes Review:** zwei wichtige Befunde behoben — ein sehr kurzes Kurvenpaar (grob
+≤55ms je Seite) rundete den Bandradius bei `DTW_BAND_RADIUS=0.1` auf 0 Frames, wodurch
+`librosa.sequence.dtw` mit einer nicht abgefangenen `ParameterError` abgestürzt wäre statt wie
+vor diesem Bugfix ein (unbegrenztes, aber funktionierendes) Ergebnis zu liefern; behoben durch
+einen Fallback auf unbegrenztes Alignment, sobald der berechnete Bandradius unter einen Frame
+fiele. Außerdem war die Drift-Schwelle des neuen Pausentests mit `< 5.0s` so locker gewählt,
+dass sie auch mit librosa's deutlich weiterem Default-Bandradius (0.25) noch grün geblieben
+wäre und damit nicht wirklich den konfigurierten Wert `DTW_BAND_RADIUS=0.1` absicherte; auf
+`< 3.0s` verschärft, was bei den tatsächlich gemessenen ~2.0s noch komfortabel Luft lässt.

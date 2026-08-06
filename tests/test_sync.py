@@ -113,6 +113,24 @@ def test_align_curves_handles_empty_input_without_raising():
     assert result == {"sung_curve": [], "target_duration": 0.0}
 
 
+def test_align_curves_handles_very_short_curves_without_band_related_crash():
+    # 3 Frames je Seite - bei DTW_BAND_RADIUS=0.1 rundet der Bandradius auf 0 Frames,
+    # was librosa.sequence.dtw ohne die Absicherung in align_curves() zum Werfen von
+    # ParameterError bringen wuerde.
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(3)]
+    target_envelope = [0.0, 1.0, 0.0]
+    sung_curve = [
+        {"t": round(i * 0.01, 3), "hz": 440.0, "voiced": True, "confidence": 0.9}
+        for i in range(3)
+    ]
+    sung_envelope = [0.0, 1.0, 0.0]
+
+    result = align_curves(target_curve, target_envelope, sung_curve, sung_envelope)
+
+    assert len(result["sung_curve"]) == 3
+    assert all(frame["aligned_t"] is not None for frame in result["sung_curve"])
+
+
 def test_duration_ratio_exceeds_limit_rejects_disproportionate_target():
     # Ziel (300s) ist deutlich mehr als MAX_DURATION_RATIO x so lang wie die Aufnahme (10s).
     assert duration_ratio_exceeds_limit(target_duration=300.0, sung_duration=10.0) is True
@@ -177,9 +195,9 @@ def test_align_curves_self_alignment_stays_near_zero_through_a_long_pause():
     deltas = [abs(f["aligned_t"] - f["t"]) for f in aligned if f["aligned_t"] is not None]
     assert deltas, "kein einziger Frame wurde ausgerichtet - Fixture oder Pipeline kaputt"
     max_drift = max(deltas)
-    assert max_drift < 5.0, (
+    assert max_drift < 3.0, (
         f"Ausrichtung sollte auch durch die Gesangspause hindurch nahe an der "
-        f"Diagonale bleiben (Drift < 5s, siehe Design-Dokument: 'einstellige "
+        f"Diagonale bleiben (Drift < 3s, siehe Design-Dokument: 'einstellige "
         f"Sekundenzahl'), tatsaechlich max. {max_drift:.2f}s - DTW driftet "
         f"waehrend/nach der Pause."
     )

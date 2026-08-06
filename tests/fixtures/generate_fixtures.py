@@ -119,12 +119,6 @@ def generate(output_dir: Path = FIXTURES_DIR) -> tuple[Path, Path]:
     return midi_path, wav_path
 
 
-if __name__ == "__main__":
-    midi_path, wav_path = generate()
-    print(f"Erzeugt: {midi_path}")
-    print(f"Erzeugt: {wav_path}")
-
-
 # --- Pausen-Fixture (Bugfix: DTW-Drift bei Pausen, Phase 3) ---
 #
 # Simuliert einen Instrumentalteil (der reale, auf einem Telefon beobachtete Fall:
@@ -220,3 +214,13 @@ def generate_pause_test_wav(output_dir: Path = FIXTURES_DIR) -> tuple[Path, Path
     sf.write(str(sung_path), build_pause_test_sung_wav(), SAMPLE_RATE)
 
     return target_path, sung_path
+
+
+if __name__ == "__main__":
+    midi_path, wav_path = generate()
+    print(f"Erzeugt: {midi_path}")
+    print(f"Erzeugt: {wav_path}")
+
+    pause_target_path, pause_sung_path = generate_pause_test_wav()
+    print(f"Erzeugt: {pause_target_path}")
+    print(f"Erzeugt: {pause_sung_path}")
