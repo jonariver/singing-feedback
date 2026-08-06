@@ -1,2 +1,5 @@
-"""Claude-generiertes Feedback (Phase 6): siehe generate.py fuer den Orchestrator,
-der von backend/api/routes.py aufgerufen wird."""
+"""Claude-generiertes Feedback (Phase 6): siehe generate.py fuer den Orchestrator."""
+
+from .generate import FeedbackUnavailableError, generate_feedback
+
+__all__ = ["FeedbackUnavailableError", "generate_feedback"]
