@@ -49,6 +49,7 @@ def _note(
     stability_flag: bool = False,
     drift_flag: bool = False,
     drift_direction: str | None = None,
+    sung_t: float | None = None,
 ) -> dict:
     return {
         "index": index,
@@ -68,6 +69,7 @@ def _note(
             "flag": drift_flag,
             "direction": drift_direction,
         },
+        "sung_t": sung_t,
     }
 
 
@@ -148,6 +150,18 @@ def test_build_prompt_context_samples_evenly_across_the_whole_song_when_capped()
     expected_step = 199 / 149
     max_gap = max(b - a for a, b in zip(flagged_indices, flagged_indices[1:]))
     assert max_gap <= expected_step * 2
+
+
+def test_build_prompt_context_carries_sung_t_through():
+    notes = [_note(0, missed=True, sung_t=12.5)]
+    context = build_prompt_context(_score_result(notes))
+    assert context["flagged_notes"][0]["sung_t"] == 12.5
+
+
+def test_build_prompt_context_flagged_note_sung_t_can_be_none():
+    notes = [_note(0, missed=True, sung_t=None)]
+    context = build_prompt_context(_score_result(notes))
+    assert context["flagged_notes"][0]["sung_t"] is None
 
 
 class _FakeMessagesClient:

@@ -57,6 +57,7 @@ def build_prompt_context(score_result: dict) -> dict:
                 "stability_flag": note["stability"]["flag"],
                 "phrase_end_drift_flag": note["phrase_end_drift"]["flag"],
                 "phrase_end_drift_direction": note["phrase_end_drift"]["direction"],
+                "sung_t": note["sung_t"],
             })
     return {"summary": summary, "flagged_notes": _sample_evenly(flagged_notes, _MAX_FLAGGED_NOTES_IN_PROMPT)}
 

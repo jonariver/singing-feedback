@@ -354,3 +354,20 @@ def test_score_performance_single_correct_note():
     assert note["timing"]["classification"] == "on_time"
     assert result["summary"]["cents_green"] == 1
     assert result["summary"]["problem_tags"] == []
+
+
+def test_score_performance_includes_sung_t_from_first_attributed_frame():
+    target_curve = _flat_curve(440.0, 100)  # eine Note, 0.0s-1.0s
+    sung_curve = [
+        {"t": round(i * 0.01, 3), "hz": 440.0, "voiced": True, "confidence": 0.9,
+         "aligned_t": round(i * 0.01, 3)}
+        for i in range(50)
+    ]
+    score = score_performance(target_curve, sung_curve)
+    assert score["notes"][0]["sung_t"] == pytest.approx(0.0)
+
+
+def test_score_performance_sung_t_is_none_when_note_has_no_attributed_frames():
+    target_curve = _flat_curve(440.0, 100)
+    score = score_performance(target_curve, [])
+    assert score["notes"][0]["sung_t"] is None

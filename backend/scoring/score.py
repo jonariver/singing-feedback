@@ -84,6 +84,7 @@ def score_performance(
             "held": is_held_note(note),
             "stability": stability,
             "phrase_end_drift": drift,
+            "sung_t": attributed[0]["t"] if attributed else None,
         })
 
     note_count = len(notes)
