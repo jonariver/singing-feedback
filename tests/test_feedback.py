@@ -126,10 +126,28 @@ def test_build_prompt_text_says_keine_when_no_flagged_notes():
     assert "- keine" in text
 
 
-def test_build_prompt_context_caps_flagged_notes_at_50():
-    notes = [_note(i, missed=True) for i in range(60)]
+def test_build_prompt_context_caps_flagged_notes_at_150():
+    notes = [_note(i, missed=True) for i in range(200)]
     context = build_prompt_context(_score_result(notes))
-    assert len(context["flagged_notes"]) == 50
+    assert len(context["flagged_notes"]) == 150
+
+
+def test_build_prompt_context_samples_evenly_across_the_whole_song_when_capped():
+    # 200 auffaellige Noten ueber einen langen Song verteilt - ohne Sampling wuerde
+    # ein chronologischer Prefix von 150 nur die erste dreiviertel Songdauer zeigen
+    # und Noten 150-199 (die letzten ~25%) komplett aus dem Prompt fallen lassen.
+    notes = [_note(i, missed=True) for i in range(200)]
+    context = build_prompt_context(_score_result(notes))
+    flagged_indices = [n["index"] for n in context["flagged_notes"]]
+    assert flagged_indices[0] == 0
+    assert flagged_indices[-1] == 199
+    # Ueberpruef, dass die Auswahl wirklich ueber die ganze Spanne gestreut ist statt
+    # geklumpt zu sein: kein Abstand zwischen benachbarten ausgewaehlten Noten darf
+    # groesser als 2x der erwarteten mittleren Schrittweite (200 Noten / 150 Auswahl)
+    # sein.
+    expected_step = 199 / 149
+    max_gap = max(b - a for a, b in zip(flagged_indices, flagged_indices[1:]))
+    assert max_gap <= expected_step * 2
 
 
 class _FakeMessagesClient:

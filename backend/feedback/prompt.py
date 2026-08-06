@@ -8,9 +8,27 @@ from __future__ import annotations
 # davon, wie viele Noten score_result mitbringt. Ohne diese Grenze koennte ein
 # Aufrufer (der /api/feedback-Endpoint prueft nur die Gesamtgroesse des Requests,
 # nicht die Notenzahl) mit einem grossen, synthetischen score-Dict einen beliebig
-# grossen, voll kostenpflichtigen Anthropic-Prompt erzwingen. Claude braucht ohnehin
-# nur genug Problem-Noten, um bis zu 3 Punkte abzuleiten.
-_MAX_FLAGGED_NOTES_IN_PROMPT = 50
+# grossen, voll kostenpflichtigen Anthropic-Prompt erzwingen. 150 liegt bequem ueber
+# der Anzahl auffaelliger Noten, die ein realer, mehrminuetiger Song mitbringen kann
+# (Text-Tokens fuer 150 Notenzeilen sind ohnehin vernachlaessigbar) - der Wert ist
+# also eine Sicherheits-, keine Qualitaetsgrenze. Bei Ueberschreitung waehlt
+# _sample_evenly() gleichmaessig ueber die ganze Liste statt nur den Anfang, damit
+# auch bei sehr vielen Problemen der ganze Song im Prompt repraesentiert bleibt.
+_MAX_FLAGGED_NOTES_IN_PROMPT = 150
+
+
+def _sample_evenly(items: list, max_count: int) -> list:
+    """Waehlt bis zu max_count Eintraege gleichmaessig verteilt aus items aus (erster
+    und letzter Eintrag immer enthalten), statt einen chronologischen Prefix zu
+    nehmen - sonst waere bei mehr als max_count auffaelligen Noten in einem langen
+    Song nur der Songanfang im Prompt vertreten."""
+    if len(items) <= max_count:
+        return items
+    if max_count <= 1:
+        return items[:max_count]
+    step = (len(items) - 1) / (max_count - 1)
+    indices = sorted({round(i * step) for i in range(max_count)})
+    return [items[i] for i in indices]
 
 
 def build_prompt_context(score_result: dict) -> dict:
@@ -40,7 +58,7 @@ def build_prompt_context(score_result: dict) -> dict:
                 "phrase_end_drift_flag": note["phrase_end_drift"]["flag"],
                 "phrase_end_drift_direction": note["phrase_end_drift"]["direction"],
             })
-    return {"summary": summary, "flagged_notes": flagged_notes[:_MAX_FLAGGED_NOTES_IN_PROMPT]}
+    return {"summary": summary, "flagged_notes": _sample_evenly(flagged_notes, _MAX_FLAGGED_NOTES_IN_PROMPT)}
 
 
 def build_prompt_text(context: dict) -> str:
