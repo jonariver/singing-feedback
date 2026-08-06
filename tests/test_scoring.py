@@ -11,6 +11,7 @@ from backend.scoring.pitch import (
     compute_coverage_fraction,
     is_missed,
 )
+from backend.scoring.timing import classify_timing, compute_onset_deviation_ms
 
 
 def _flat_curve(hz: float, n_frames: int, start_idx: int = 0, frame_rate_hz: float = 100.0) -> list[dict]:
@@ -161,3 +162,30 @@ def test_is_missed_flags_low_coverage():
 def test_is_missed_flags_gross_pitch_error():
     assert is_missed(coverage_fraction=1.0, cents_value=500.0) is True
     assert is_missed(coverage_fraction=1.0, cents_value=100.0) is False
+
+
+def test_classify_timing_boundaries():
+    assert classify_timing(60.0) == "on_time"
+    assert classify_timing(60.1) == "too_early"
+    assert classify_timing(-60.0) == "on_time"
+    assert classify_timing(-60.1) == "too_late"
+
+
+def test_compute_onset_deviation_ms_recovers_offset():
+    # Zielnote beginnt bei t=2.0s; die "gesungene" Onset-Umgebung liegt bei
+    # aligned_t~2.0, aber raw t~1.85 (150ms zu frueh gesungen) - deviation_ms
+    # muss ~+150ms betragen (aligned_t - t).
+    note = {"start_t": 2.0, "end_t": 3.0}
+    sung_curve = [
+        {"t": round(1.85 + i * 0.01, 3), "hz": 391.995, "voiced": True,
+         "aligned_t": round(2.0 + i * 0.01, 3)}
+        for i in range(10)
+    ]
+    deviation = compute_onset_deviation_ms(sung_curve, note)
+    assert deviation is not None
+    assert 100 <= deviation <= 200
+
+
+def test_compute_onset_deviation_ms_none_without_voiced_frames():
+    note = {"start_t": 2.0, "end_t": 3.0}
+    assert compute_onset_deviation_ms([], note) is None
