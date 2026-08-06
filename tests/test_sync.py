@@ -7,7 +7,7 @@ import pretty_midi
 import pytest
 
 from backend.sync import (
-    # align_curves,  # TODO: uncomment in Task 3 when align_curves is implemented
+    align_curves,
     onset_envelope_from_midi_track,
     onset_envelope_from_signal,
 )
@@ -74,3 +74,30 @@ def test_onset_envelope_from_midi_track_onset_near_track_end_not_dropped():
     # Verify the note's onset frame (100 = int(1.006/0.01)) has a peak value >= decay kernel's maximum
     # The decay kernel starts at exp(-3.0*0/6) = exp(0) = 1.0
     assert env[100] == pytest.approx(1.0), "Onset at frame 100 should peak at 1.0, not be silently dropped"
+
+
+def test_align_curves_recovers_early_onset_offset():
+    step = 0.01  # 100Hz
+    n = 200
+    target_curve = [{"t": round(i * step, 3), "hz": 440.0, "midi_note": 69} for i in range(n)]
+    target_envelope = [0.0] * n
+    target_envelope[50] = 1.0  # Zielereignis bei t=0.50s
+
+    sung_curve = [
+        {"t": round(i * step, 3), "hz": 440.0, "voiced": True, "confidence": 0.9}
+        for i in range(n)
+    ]
+    sung_envelope = [0.0] * n
+    sung_envelope[35] = 1.0  # dasselbe Ereignis, aber 150ms (15 Frames) zu frueh (t=0.35s)
+
+    result = align_curves(target_curve, target_envelope, sung_curve, sung_envelope)
+
+    assert result["target_duration"] == target_curve[-1]["t"]
+    aligned_t = result["sung_curve"][35]["aligned_t"]
+    assert aligned_t is not None
+    assert abs(aligned_t - 0.50) < 0.03
+
+
+def test_align_curves_handles_empty_input_without_raising():
+    result = align_curves([], [], [], [])
+    assert result == {"sung_curve": [], "target_duration": 0.0}
