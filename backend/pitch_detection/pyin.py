@@ -8,91 +8,26 @@ ohne die aufrufende API zu aendern.
 
 from __future__ import annotations
 
-import os
-import tempfile
-
-import av
 import librosa
 import numpy as np
 
-_ALLOWED_SUFFIXES = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".webm"}
+from backend.audio_io import AudioDecodeError, load_audio_signal
 
 
 class PitchAnalysisError(Exception):
     """Aufnahme konnte nicht gelesen oder analysiert werden."""
 
 
-def _safe_suffix(filename_hint: str) -> str:
-    suffix = os.path.splitext(filename_hint or "")[1].lower()
-    return suffix if suffix in _ALLOWED_SUFFIXES else ".wav"
-
-
-def _load_with_pyav(path: str) -> tuple[np.ndarray, int]:
-    """Dekodiert Formate, die soundfile/audioread nicht lesen koennen (z.B. AAC-in-M4A,
-    Opus-in-WebM von Mobile-/Browser-Recordern). PyAV bringt eigene ffmpeg-Libs im Wheel
-    mit, braucht also anders als audioreads ffmpeg-Fallback keinen System-ffmpeg-Binary."""
-    container = av.open(path)
-    try:
-        stream = container.streams.audio[0]
-        sr = stream.codec_context.sample_rate
-        resampler = av.AudioResampler(format="fltp", layout="mono", rate=sr)
-        chunks = [
-            rframe.to_ndarray()
-            for frame in container.decode(stream)
-            for rframe in resampler.resample(frame)
-        ]
-    finally:
-        container.close()
-
-    if not chunks:
-        raise ValueError("PyAV hat keine Audio-Frames dekodiert.")
-    y = np.concatenate(chunks, axis=1)[0].astype(np.float32)
-    return y, sr
-
-
-def analyze_pitch(
-    audio_bytes: bytes,
-    filename_hint: str = "upload.wav",
-    max_seconds: float = 90.0,
+def pitch_curve_from_signal(
+    y: np.ndarray,
+    sr: int,
     fmin: float = 65.0,
     fmax: float = 1050.0,
     frame_rate_hz: float = 100.0,
 ) -> list[dict]:
-    """Liefert die gesungene Tonhoehe als Zeitreihe: [{t, hz|None, voiced, confidence}].
-
-    hz ist None fuer unstimmhafte/stille Abschnitte (Pausen, Atmen, Konsonanten).
-    Die Audiodatei wird nur in einer temporaeren Datei zwischengehalten und danach
-    sofort geloescht - keine dauerhafte Speicherung (siehe Datenschutz-Leitplanke).
-    """
-    if not audio_bytes:
-        raise PitchAnalysisError("Keine Audiodaten empfangen.")
-
-    tmp_path: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=_safe_suffix(filename_hint), delete=False) as tmp:
-            tmp.write(audio_bytes)
-            tmp_path = tmp.name
-
-        try:
-            y, sr = librosa.load(tmp_path, sr=None, mono=True)
-        except Exception:
-            try:
-                y, sr = _load_with_pyav(tmp_path)
-            except Exception as exc:
-                raise PitchAnalysisError(
-                    f"Audiodatei konnte nicht dekodiert werden (Format nicht unterstuetzt?): {exc}"
-                ) from exc
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
-
-    if y.size == 0:
-        raise PitchAnalysisError("Audiodatei enthaelt keine Samples.")
-
-    max_samples = int(max_seconds * sr)
-    if y.shape[0] > max_samples:
-        y = y[:max_samples]
-
+    """Liefert die Tonhoehe eines bereits dekodierten Signals als Zeitreihe:
+    [{t, hz|None, voiced, confidence}]. hz ist None fuer unstimmhafte/stille
+    Abschnitte (Pausen, Atmen, Konsonanten)."""
     hop_length = max(1, int(round(sr / frame_rate_hz)))
     f0, voiced_flag, voiced_prob = librosa.pyin(
         y, fmin=fmin, fmax=fmax, sr=sr, hop_length=hop_length,
@@ -109,3 +44,24 @@ def analyze_pitch(
             "confidence": round(float(prob), 3) if not np.isnan(prob) else 0.0,
         })
     return curve
+
+
+def analyze_pitch(
+    audio_bytes: bytes,
+    filename_hint: str = "upload.wav",
+    max_seconds: float = 90.0,
+    fmin: float = 65.0,
+    fmax: float = 1050.0,
+    frame_rate_hz: float = 100.0,
+) -> list[dict]:
+    """Liefert die gesungene Tonhoehe als Zeitreihe: [{t, hz|None, voiced, confidence}].
+
+    Dekodiert die Audiobytes (temporaer, wird sofort danach geloescht - siehe
+    Datenschutz-Leitplanke) und delegiert die eigentliche Tonhoehenberechnung an
+    pitch_curve_from_signal().
+    """
+    try:
+        y, sr = load_audio_signal(audio_bytes, filename_hint, max_seconds)
+    except AudioDecodeError as exc:
+        raise PitchAnalysisError(str(exc)) from exc
+    return pitch_curve_from_signal(y, sr, fmin=fmin, fmax=fmax, frame_rate_hz=frame_rate_hz)
