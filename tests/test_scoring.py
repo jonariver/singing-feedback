@@ -5,6 +5,12 @@ from __future__ import annotations
 import pytest
 
 from backend.scoring.notes import attribute_sung_frames, hz_to_cents, segment_target_notes
+from backend.scoring.pitch import (
+    classify_cents,
+    compute_cents_deviation,
+    compute_coverage_fraction,
+    is_missed,
+)
 
 
 def _flat_curve(hz: float, n_frames: int, start_idx: int = 0, frame_rate_hz: float = 100.0) -> list[dict]:
@@ -89,3 +95,62 @@ def test_attribute_sung_frames_last_note_is_open_ended():
     sung_curve = [{"t": 2.5, "aligned_t": 2.5}]
     attributed = attribute_sung_frames(sung_curve, note, is_last_note=True)
     assert [f["t"] for f in attributed] == [2.5]
+
+
+def _sung_frame(t: float, hz: float | None, voiced: bool = True, aligned_t: float | None = None) -> dict:
+    return {
+        "t": t,
+        "hz": hz,
+        "voiced": voiced,
+        "confidence": 0.9,
+        "aligned_t": aligned_t if aligned_t is not None else t,
+    }
+
+
+def test_classify_cents_boundaries():
+    assert classify_cents(14.9) == "green"
+    assert classify_cents(15.0) == "green"
+    assert classify_cents(15.1) == "yellow"
+    assert classify_cents(-49.9) == "yellow"
+    assert classify_cents(50.0) == "yellow"
+    assert classify_cents(50.1) == "red"
+
+
+def test_compute_cents_deviation_uses_median_not_mean():
+    note = {"start_t": 0.0, "end_t": 1.2, "hz": 440.0}
+    frames = [_sung_frame(round(i * 0.01, 3), 440.0) for i in range(90)]
+    # Letzte 30 Frames (Phrasenende) driften stark ab - Median soll das ignorieren.
+    frames += [
+        _sung_frame(round((90 + i) * 0.01, 3), 440.0 * 2 ** (-100 * (i / 30) / 1200))
+        for i in range(30)
+    ]
+    result = compute_cents_deviation(note, frames)
+    assert result is not None
+    assert abs(result["value"]) < 5
+
+
+def test_compute_cents_deviation_none_without_voiced_frames():
+    note = {"start_t": 0.0, "end_t": 1.0, "hz": 440.0}
+    frames = [_sung_frame(0.5, None, voiced=False)]
+    assert compute_cents_deviation(note, frames) is None
+
+
+def test_compute_coverage_fraction_full_coverage():
+    note = {"start_t": 0.0, "end_t": 1.0}
+    frames = [_sung_frame(round(i * 0.01, 3), 440.0) for i in range(100)]
+    assert compute_coverage_fraction(note, frames) == pytest.approx(1.0, abs=0.02)
+
+
+def test_compute_coverage_fraction_no_voiced_frames():
+    note = {"start_t": 0.0, "end_t": 1.0}
+    assert compute_coverage_fraction(note, []) == 0.0
+
+
+def test_is_missed_flags_low_coverage():
+    assert is_missed(coverage_fraction=0.3, cents_value=0.0) is True
+    assert is_missed(coverage_fraction=0.8, cents_value=0.0) is False
+
+
+def test_is_missed_flags_gross_pitch_error():
+    assert is_missed(coverage_fraction=1.0, cents_value=500.0) is True
+    assert is_missed(coverage_fraction=1.0, cents_value=100.0) is False
