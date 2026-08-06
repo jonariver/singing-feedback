@@ -239,3 +239,30 @@ def test_compute_stability_and_drift_ignore_constant_offset():
     drift = compute_phrase_end_drift(note, frames)
     assert stability["flag"] is False
     assert drift["flag"] is False
+
+
+def test_compute_stability_excludes_tail_even_when_tail_dominates_frame_count():
+    # Kurze gehaltene Note (0.62s): Hauptteil nur 27 Frames, Tail 30 Frames - der
+    # Tail waere zahlenmaessig in der Mehrheit, wenn er faelschlich mit einbezogen
+    # wuerde. Body ist sauber (0 Cent), Tail wackelt stark (+-300 Cent) - eine
+    # nicht-disjunkte Implementierung (die den Hauptteil bis end_t statt bis
+    # end_t - DRIFT_TAIL_SECONDS berechnet) wuerde hier MAD weit ueber die
+    # Schwelle treiben; die korrekte, disjunkte Implementierung nicht.
+    note = {"start_t": 0.0, "end_t": 0.62, "hz": 440.0}
+    body_frames = [
+        _sung_frame(round(0.05 + i * 0.01, 3), 440.0, aligned_t=round(0.05 + i * 0.01, 3))
+        for i in range(27)
+    ]
+    tail_frames = []
+    for i in range(30):
+        cents = 300.0 if i % 2 == 0 else -300.0
+        hz = 440.0 * 2 ** (cents / 1200.0)
+        tail_frames.append(
+            _sung_frame(round(0.32 + i * 0.01, 3), hz, aligned_t=round(0.32 + i * 0.01, 3))
+        )
+    frames = body_frames + tail_frames
+
+    stability = compute_stability(note, frames)
+    assert stability["applicable"] is True
+    assert stability["flag"] is False
+    assert stability["mad_cents"] < 5.0
