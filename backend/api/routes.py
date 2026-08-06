@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
+from backend.audio_io import AudioDecodeError, load_audio_signal
 from backend.config import MAX_AUDIO_SECONDS, PITCH_FMAX_HZ, PITCH_FMIN_HZ
 from backend.midi_analysis import list_track_candidates, load_midi, track_pitch_curve
-from backend.pitch_detection import PitchAnalysisError, analyze_pitch
+from backend.pitch_detection import PitchAnalysisError, analyze_pitch, pitch_curve_from_signal
+from backend.sync import align_curves, onset_envelope_from_midi_track, onset_envelope_from_signal
 
 from .rate_limit import enforce_upload_rate_limit
 from .state import MIDI_SESSIONS
@@ -105,3 +107,59 @@ def analyze_audio(request: Request, file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"curve": curve}
+
+
+@router.post("/sync/align", dependencies=[Depends(enforce_upload_rate_limit)])
+def sync_align(
+    request: Request,
+    sung_audio: UploadFile = File(...),
+    session_id: str | None = Form(None),
+    track_index: int | None = Form(None),
+    transpose: int = Form(0),
+    reference_audio: UploadFile | None = File(None),
+) -> dict:
+    _reject_oversized_content_length(request, MAX_AUDIO_UPLOAD_BYTES)
+
+    sung_bytes = sung_audio.file.read()
+    if len(sung_bytes) > MAX_AUDIO_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Audiodatei ist unerwartet gross.")
+
+    try:
+        y_sung, sr_sung = load_audio_signal(sung_bytes, sung_audio.filename or "sung.wav", MAX_AUDIO_SECONDS)
+    except AudioDecodeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    sung_curve = pitch_curve_from_signal(y_sung, sr_sung, fmin=PITCH_FMIN_HZ, fmax=PITCH_FMAX_HZ)
+    sung_envelope = onset_envelope_from_signal(y_sung, sr_sung)
+
+    if reference_audio is not None:
+        ref_bytes = reference_audio.file.read()
+        if len(ref_bytes) > MAX_AUDIO_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Referenz-Audiodatei ist unerwartet gross.")
+        try:
+            y_ref, sr_ref = load_audio_signal(
+                ref_bytes, reference_audio.filename or "reference.wav", MAX_AUDIO_SECONDS,
+            )
+        except AudioDecodeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        target_curve = pitch_curve_from_signal(y_ref, sr_ref, fmin=PITCH_FMIN_HZ, fmax=PITCH_FMAX_HZ)
+        target_envelope = onset_envelope_from_signal(y_ref, sr_ref)
+    elif session_id is not None and track_index is not None:
+        pm = MIDI_SESSIONS.get(session_id)
+        if pm is None:
+            raise HTTPException(
+                status_code=404,
+                detail="MIDI-Session nicht gefunden oder abgelaufen - bitte Datei erneut hochladen.",
+            )
+        try:
+            target_curve = track_pitch_curve(pm, track_index, transpose_semitones=transpose)
+            target_envelope = onset_envelope_from_midi_track(pm, track_index)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Entweder session_id und track_index oder reference_audio angeben.",
+        )
+
+    result = align_curves(target_curve, target_envelope, sung_curve, sung_envelope)
+    return {"target_curve": target_curve, **result}
