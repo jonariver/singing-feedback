@@ -17,7 +17,7 @@ class _RealShareController implements ShareController {
   @override
   Future<void> shareBytes(Uint8List bytes, String filename) async {
     final file = XFile.fromData(bytes, name: filename, mimeType: _mimeTypeFor(filename));
-    await SharePlus.instance.share(ShareParams(files: [file]));
+    await SharePlus.instance.share(ShareParams(files: [file], fileNameOverrides: [filename]));
   }
 
   String? _mimeTypeFor(String filename) {
