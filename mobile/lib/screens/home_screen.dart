@@ -117,6 +117,7 @@ class HomeScreen extends StatelessWidget {
             const Divider(height: 32),
             Text('3. Tonhöhen-Vergleich', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
+            StatusBanner(status: session.alignStatus, message: session.alignMessage),
             SizedBox(
               height: 300,
               width: double.infinity,

@@ -122,3 +122,58 @@ Auch nach dem Hochladen sollte man sich die eigene Aufnahme nochmal anhören kö
   der ursprünglichen Planung doch automatisierte Tests für den neuen Button zu schreiben —
   beides umgesetzt, inklusive eines eigens dafür geschaffenen Test-Einstiegspunkts, um den
   `AudioPlayer` in Tests durch eine Fälschung zu ersetzen.
+
+## 2026-08-06 — Feature: DTW-Zeitausrichtung (Phase 3)
+
+Bisher lagen Ziel- und Gesangskurve einfach unausgerichtet nebeneinander im Chart — wer zu
+früh oder zu spät einsetzte, sah eine verschobene statt eine vergleichbare Kurve. Phase 3
+richtet die gesungene Aufnahme per DTW zeitlich an der Zielmelodie aus, sowohl bei
+MIDI-Zielen als auch bei einer selbst aufgenommenen Referenz.
+
+- **`a4a07d9` — Design-Spec** und **`c32e91d` — Implementierungsplan**.
+- **`77e2a4e` — refactor: extract audio decoding into backend/audio_io.py**
+  Vorarbeit: die bisher in `pitch_detection` verstreute Audio-Dekodierung (WAV/MP3/WebM via
+  PyAV-Fallback) wandert in ein eigenes Modul, damit sowohl die Pitch-Erkennung als auch der
+  neue Sync-Endpunkt dieselbe Dekodier-/Kürzungslogik (inkl. `MAX_AUDIO_SECONDS`) benutzen
+  können, ohne sie zu duplizieren.
+- **`8bcc9c2` — feat: add onset-envelope extraction for DTW alignment**
+  Neues Modul `backend/sync/features.py`: statt DTW auf der Rohtonhöhe laufen zu lassen (was
+  genau dann versagen würde, wenn jemand die falsche Note singt), wird eine
+  tonhöhen-unabhängige Onset-/Energie-Hüllkurve extrahiert — synthetisch aus den
+  MIDI-Notenanfängen für die Zielseite, aus `librosa.onset.onset_strength` für echtes Audio.
+- **`2a1038d` — fix: use consistent floor semantics for onset_frame**
+  Ein Rundungsfehler hätte Onsets nah am Spurende still verworfen, wenn `onset_frame` anders
+  gerundet wurde als die Frame-Anzahl der Kurve; mit Regressionstest behoben.
+- **`cf1fe8e` — feat: add DTW curve alignment (backend/sync/align.py)**
+  Das Herzstück: `align_curves()` normalisiert beide Hüllkurven (Z-Score) und lässt
+  `librosa.sequence.dtw` (globales Alignment, `subseq=False`) einen Warping-Pfad berechnen,
+  aus dem jeder gesungene Frame ein `aligned_t` auf der Zielzeitachse bekommt.
+- **`4fda8b5` — test: add Phase 3 end-to-end DTW alignment validation**
+  End-to-End-Test mit synthetischen Fixtures und absichtlichem Timing-Versatz, analog zum
+  Phase-1-E2E-Test.
+- **`d5ff227` — feat: add POST /api/sync/align endpoint** und **`6fcefdd` — fix: use
+  2 * MAX_AUDIO_UPLOAD_BYTES for early content-length check**
+  Neuer Endpunkt, der Gesangs- und Zielkurve (MIDI-Session oder Referenzaudio) entgegennimmt
+  und das Alignment-Ergebnis zurückgibt; der Fix korrigiert die Vorab-Größenprüfung, die bei
+  zwei Uploads (Gesang + Referenz) sonst zu früh ausgelöst hätte.
+- **`c416fc8` — feat: add SyncApi and aligned_t support to mobile API layer**
+  Dünner Client-Wrapper für den neuen Endpunkt plus `alignedT`-Feld im `SungPoint`-Modell.
+- **`60ceeb0` — feat: auto-trigger DTW alignment after recording analysis**
+  `SessionState.align()` läuft automatisch am Ende von `analyzeAudio()` — kein zusätzlicher
+  manueller Button nötig.
+- **`5e2ad6a` — feat: render DTW-aligned sung curve in PitchChart**
+  Der Chart zeichnet jetzt die ausgerichtete Kurve, sobald ein Alignment vorliegt, und fällt
+  bei fehlendem/fehlgeschlagenem Alignment automatisch auf die rohe Kurve zurück statt
+  abzustürzen oder leer zu bleiben.
+
+**Abschließendes Review (ohne eigenen Commit-Hash, in diesem Fix-Sweep behoben):** vier
+wichtige Befunde — ein wechselndes Ziel (andere MIDI-Spur oder neue Referenzaufnahme) ließ
+das alte Alignment stehen und zeichnete es gegen die falsche Zielmelodie weiter; ein langes
+MIDI-Ziel war serverseitig nicht in der Dauer begrenzt und konnte die DTW-Kostenmatrix auf
+mehrere GB RAM aufblähen bzw. (bei global erzwungenem Alignment) ein unbemerkt falsches,
+verschmiertes Ergebnis liefern, wenn die Aufnahme nur einen Bruchteil des Ziels abdeckte; und
+der Ausrichtungsstatus wurde zwar berechnet, aber nirgends angezeigt. Behoben durch: Reset des
+Alignment-Zustands in `selectTrack()`/`analyzeReference()`, einen neuen
+Dauer-Verhältnis-Schutz (`duration_ratio_exceeds_limit`, Ziel darf höchstens dreimal so lang
+sein wie die Aufnahme) vor dem DTW-Aufruf in `sync_align`, und eine `StatusBanner` für
+`alignStatus`/`alignMessage` im Home-Screen.

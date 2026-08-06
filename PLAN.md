@@ -1,7 +1,7 @@
 # Singing Feedback MVP — Architektur & Phasenplan
 
-> **Status:** Phase 0 (Skeleton) und Phase 1 (vertikaler Prototyp) sind umgesetzt und getestet
-> (siehe `README.md`). Weiter geht es mit Phase 2 (bessere Spurerkennung & Transposition).
+> **Status:** Phase 0 (Skeleton), Phase 1 (vertikaler Prototyp) und Phase 3 (robuste
+> Synchronisation) sind umgesetzt und getestet (siehe `README.md`).
 
 ## Context
 
@@ -56,7 +56,10 @@ tests/
 - `pretty_midi` — MIDI-Parsing (Noten, Instrumente, Tempo, Tonhöhenbereich pro Spur)
 - `librosa` (inkl. `pyin`) — Tonhöhenerkennung; leichtgewichtiger als CREPE (kein TensorFlow/Torch
   nötig), als Modul austauschbar falls später mehr Genauigkeit gewünscht ist
-- `numpy`/`scipy` — DSP-Grundlagen, eigener DTW-Featurevergleich
+- `numpy` — DSP-Grundlagen (Onset-/Energie-Huellkurven, Normalisierung)
+- `librosa.sequence.dtw` — DTW-Zeitausrichtung Aufnahme <-> Zielkurve (kein eigener
+  DTW-Featurevergleich: librosa ist wegen `pyin` ohnehin Pflichtabhaengigkeit, siehe
+  `docs/superpowers/specs/2026-08-06-dtw-time-alignment-design.md` fuer die Begruendung)
 - `soundfile` + `av` (PyAV) — WAV/MP3 lesen und vom Browser gelieferte WebM/Opus-Aufnahmen ohne
   separate ffmpeg-Installation dekodieren (PyAV bringt statische ffmpeg-Libs im Wheel mit)
 - `anthropic` (offizielles SDK) — Claude-Aufruf, Key aus `.env` (z.B. via `python-dotenv`),
@@ -137,9 +140,14 @@ Volle Heuristik-Bewertung (Stimmumfang, Notendichte, Dauer-Plausibilität, Name-
 Mehrfachkandidaten mit Hörprobe (Sinus-Synth) im Frontend, Warnhinweis bei fehlender
 Gesangsspur, Transpositions-Eingabe.
 
-**Phase 3 — Robuste Synchronisation**
+**Phase 3 — Robuste Synchronisation (umgesetzt)**
 DTW auf Onset-/Energie-Feature statt Rohtonhöhe, Mapping der Zeitachsen, Validierung anhand der
-synthetischen Testfälle mit absichtlichem Timing-Versatz.
+synthetischen Testfälle mit absichtlichem Timing-Versatz. Umgesetzt mit `librosa.sequence.dtw`
+(globales Alignment, `backend/sync/align.py`) statt eines eigenen DTW-Featurevergleichs — siehe
+`docs/superpowers/specs/2026-08-06-dtw-time-alignment-design.md`. Ergaenzt um einen
+Dauer-Verhältnis-Schutz (`duration_ratio_exceeds_limit`), der ein unverhältnismäßig langes
+Ziel gegenüber der Aufnahme ablehnt, statt eine potenziell mehrere GB große DTW-Kostenmatrix
+zu berechnen oder ein stillschweigend falsches, verschmiertes Alignment zu liefern.
 
 **Phase 4 — Bewertungs-Engine**
 Cent-Abweichung, verfehlte Zielnoten, zu frühe/späte Einsätze, Stabilität gehaltener Töne,

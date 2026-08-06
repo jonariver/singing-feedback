@@ -7,7 +7,9 @@ import pretty_midi
 import pytest
 
 from backend.sync import (
+    MAX_DURATION_RATIO,
     align_curves,
+    duration_ratio_exceeds_limit,
     onset_envelope_from_midi_track,
     onset_envelope_from_signal,
 )
@@ -101,3 +103,27 @@ def test_align_curves_recovers_early_onset_offset():
 def test_align_curves_handles_empty_input_without_raising():
     result = align_curves([], [], [], [])
     assert result == {"sung_curve": [], "target_duration": 0.0}
+
+
+def test_duration_ratio_exceeds_limit_rejects_disproportionate_target():
+    # Ziel (300s) ist deutlich mehr als MAX_DURATION_RATIO x so lang wie die Aufnahme (10s).
+    assert duration_ratio_exceeds_limit(target_duration=300.0, sung_duration=10.0) is True
+
+
+def test_duration_ratio_exceeds_limit_allows_comparable_durations():
+    # Ziel ist laenger als die Aufnahme, aber innerhalb des erlaubten Verhaeltnisses.
+    assert duration_ratio_exceeds_limit(target_duration=20.0, sung_duration=10.0) is False
+
+
+def test_duration_ratio_exceeds_limit_is_strict_at_the_boundary():
+    sung_duration = 10.0
+    exactly_at_limit = MAX_DURATION_RATIO * sung_duration
+    assert duration_ratio_exceeds_limit(exactly_at_limit, sung_duration) is False
+    assert duration_ratio_exceeds_limit(exactly_at_limit + 0.01, sung_duration) is True
+
+
+def test_duration_ratio_exceeds_limit_ignores_zero_or_negative_durations():
+    # Leere Kurven (Dauer 0) werden hier bewusst nicht abgelehnt - dafuer gibt es
+    # bereits andere Fehlerpfade (leere Kurve -> align_curves() liefert leeres Ergebnis).
+    assert duration_ratio_exceeds_limit(target_duration=0.0, sung_duration=10.0) is False
+    assert duration_ratio_exceeds_limit(target_duration=10.0, sung_duration=0.0) is False

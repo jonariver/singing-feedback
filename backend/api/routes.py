@@ -15,7 +15,12 @@ from backend.audio_io import AudioDecodeError, load_audio_signal
 from backend.config import MAX_AUDIO_SECONDS, PITCH_FMAX_HZ, PITCH_FMIN_HZ
 from backend.midi_analysis import list_track_candidates, load_midi, track_pitch_curve
 from backend.pitch_detection import PitchAnalysisError, analyze_pitch, pitch_curve_from_signal
-from backend.sync import align_curves, onset_envelope_from_midi_track, onset_envelope_from_signal
+from backend.sync import (
+    align_curves,
+    duration_ratio_exceeds_limit,
+    onset_envelope_from_midi_track,
+    onset_envelope_from_signal,
+)
 
 from .rate_limit import enforce_upload_rate_limit
 from .state import MIDI_SESSIONS
@@ -159,6 +164,19 @@ def sync_align(
         raise HTTPException(
             status_code=400,
             detail="Entweder session_id und track_index oder reference_audio angeben.",
+        )
+
+    target_duration = target_curve[-1]["t"] if target_curve else 0.0
+    sung_duration = sung_curve[-1]["t"] if sung_curve else 0.0
+    if duration_ratio_exceeds_limit(target_duration, sung_duration):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Zielmelodie ist deutlich laenger als die Aufnahme "
+                f"({target_duration:.0f}s vs. {sung_duration:.0f}s) - Ausrichtung nicht "
+                "sinnvoll moeglich. Bitte einen kuerzeren Ausschnitt der Zielmelodie waehlen "
+                "oder laenger singen."
+            ),
         )
 
     result = align_curves(target_curve, target_envelope, sung_curve, sung_envelope)

@@ -5,6 +5,28 @@ from __future__ import annotations
 import librosa
 import numpy as np
 
+# Ziel darf hoechstens so viel laenger sein als die Aufnahme, bevor align_curves()
+# verweigert wird (siehe duration_ratio_exceeds_limit unten fuer die Begruendung).
+MAX_DURATION_RATIO = 3.0
+
+
+def duration_ratio_exceeds_limit(target_duration: float, sung_duration: float) -> bool:
+    """True, wenn die Zieldauer die Aufnahmedauer um mehr als MAX_DURATION_RATIO uebersteigt.
+
+    Schuetzt vor zwei Problemen, die librosa.sequence.dtw bei stark unterschiedlichen
+    Kurvenlaengen hat: (1) die O(target_frames * sung_frames) grosse Kostenmatrix kann
+    bei einem langen MIDI-Ziel mehrere GB RAM belegen, und (2) globales Alignment
+    (subseq=False) zwingt selbst dann eine Ende-zu-Ende-Zuordnung, wenn die Aufnahme nur
+    einen Bruchteil der Zielmelodie abdeckt - das Ergebnis ist ein verschmiertes, aber
+    konfident aussehendes Warping ohne erkennbaren Fehler. Beide Faelle sollen vor dem
+    teuren DTW-Aufruf mit einer klaren Fehlermeldung abgefangen werden, nicht danach.
+    Rein informationslose Eingaben (Dauer 0, z.B. leere Kurve) werden bewusst nicht
+    abgelehnt - dafuer gibt es bereits andere Fehlerpfade.
+    """
+    if target_duration <= 0 or sung_duration <= 0:
+        return False
+    return target_duration > MAX_DURATION_RATIO * sung_duration
+
 
 def _zscore(values: list[float]) -> np.ndarray:
     arr = np.asarray(values, dtype=np.float64)

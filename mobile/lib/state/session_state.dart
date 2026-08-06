@@ -109,6 +109,9 @@ class SessionState extends ChangeNotifier {
     transposeSemitones = 0;
     midiStatus = LoadStatus.loading;
     midiMessage = 'Lade Zielmelodie der gewählten Spur…';
+    // Die neue Spur ist eine andere Zielmelodie - ein zuvor gegen die alte Spur
+    // berechnetes Alignment waere jetzt still falsch (siehe align()-Kommentar).
+    _resetAlignment();
     notifyListeners();
     await _reloadTargetCurve();
   }
@@ -145,9 +148,7 @@ class SessionState extends ChangeNotifier {
     sungAudioBytes = bytes;
     audioStatus = LoadStatus.loading;
     audioMessage = 'Analysiere Tonhöhe der Aufnahme…';
-    alignedSungCurve = [];
-    alignStatus = LoadStatus.idle;
-    alignMessage = '';
+    _resetAlignment();
     notifyListeners();
     try {
       sungCurve = await audioApi.analyzeAudio(bytes, filename);
@@ -212,6 +213,8 @@ class SessionState extends ChangeNotifier {
     referenceAudioBytes = bytes;
     referenceStatus = LoadStatus.loading;
     referenceMessage = 'Analysiere Referenzaufnahme…';
+    // Neue Referenzaufnahme = neue Zielmelodie - siehe selectTrack() oben.
+    _resetAlignment();
     notifyListeners();
     try {
       referenceRawCurve = await audioApi.analyzeAudio(bytes, filename);
@@ -232,9 +235,7 @@ class SessionState extends ChangeNotifier {
     sungAudioBytes = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
-    alignedSungCurve = [];
-    alignStatus = LoadStatus.idle;
-    alignMessage = '';
+    _resetAlignment();
     notifyListeners();
   }
 
@@ -245,6 +246,15 @@ class SessionState extends ChangeNotifier {
     sungAudioBytes = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
+    _resetAlignment();
+  }
+
+  /// Verwirft ein zuvor berechnetes Alignment. Muss ueberall dort aufgerufen werden,
+  /// wo sich entweder die Zielmelodie (selectTrack, analyzeReference) oder die
+  /// gesungene Aufnahme (_resetAudioSection, setReferenceSource) aendert - ein
+  /// stehen gelassenes alignedSungCurve waere sonst gegen eine andere Zielmelodie
+  /// bzw. Aufnahme berechnet und wuerde still falsch im Chart landen.
+  void _resetAlignment() {
     alignedSungCurve = [];
     alignStatus = LoadStatus.idle;
     alignMessage = '';

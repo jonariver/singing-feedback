@@ -227,4 +227,40 @@ void main() {
     expect(session.alignedSungCurve, isEmpty);
     expect(session.alignStatus, LoadStatus.idle);
   });
+
+  test('selectTrack setzt alignedSungCurve/alignStatus zurueck (neue Zielmelodie)', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    expect(session.alignedSungCurve, isNotEmpty);
+    expect(session.alignStatus, LoadStatus.ok);
+
+    // Wahl einer anderen Spur: der Netzwerkaufruf fuer die neue Zielkurve
+    // (midiApi.getTrackCurve -> ApiClient.get) ist in _FakeApiClient nicht
+    // gefaked und schlaegt daher fehl - relevant ist hier nur, dass das
+    // Alignment synchron VOR diesem Aufruf zurueckgesetzt wird.
+    await session.selectTrack(1);
+
+    expect(session.alignedSungCurve, isEmpty);
+    expect(session.alignStatus, LoadStatus.idle);
+  });
+
+  test(
+      'analyzeReference setzt alignedSungCurve/alignStatus zurueck (neue Zielmelodie im '
+      'Referenz-Modus)', () async {
+    final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.recording);
+    await session.analyzeReference(Uint8List.fromList([9, 9, 9]), 'referenz.wav');
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    expect(session.alignedSungCurve, isNotEmpty);
+    expect(session.alignStatus, LoadStatus.ok);
+
+    // Neue Referenzaufnahme = neue Zielmelodie -> das alte Alignment (gegen die
+    // vorherige Referenz berechnet) darf nicht stehen bleiben.
+    await session.analyzeReference(Uint8List.fromList([7, 7, 7]), 'referenz2.wav');
+
+    expect(session.alignedSungCurve, isEmpty);
+    expect(session.alignStatus, LoadStatus.idle);
+  });
 }
