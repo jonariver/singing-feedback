@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:singing_feedback_mobile/api/api_client.dart';
 import 'package:singing_feedback_mobile/api/audio_api.dart';
 import 'package:singing_feedback_mobile/api/midi_api.dart';
+import 'package:singing_feedback_mobile/api/sync_api.dart';
 import 'package:singing_feedback_mobile/models/target_point.dart';
 import 'package:singing_feedback_mobile/state/session_state.dart';
 
@@ -22,6 +23,18 @@ class _FakeApiClient extends ApiClient {
     Uint8List? secondBytes,
     String? secondFilename,
   }) async {
+    if (path == '/api/sync/align') {
+      return {
+        'target_curve': [
+          {'t': 0.0, 'hz': 440.0, 'midi_note': 69},
+        ],
+        'sung_curve': [
+          {'t': 0.0, 'hz': 440.0, 'voiced': true, 'confidence': 0.9, 'aligned_t': 0.05},
+          {'t': 0.01, 'hz': null, 'voiced': false, 'confidence': 0.0, 'aligned_t': null},
+        ],
+        'target_duration': 1.0,
+      };
+    }
     return {
       'curve': [
         {'t': 0.0, 'hz': 440.0, 'voiced': true, 'confidence': 0.9},
@@ -33,7 +46,11 @@ class _FakeApiClient extends ApiClient {
 
 SessionState _buildSession() {
   final client = _FakeApiClient();
-  return SessionState(midiApi: MidiApi(client), audioApi: AudioApi(client));
+  return SessionState(
+    midiApi: MidiApi(client),
+    audioApi: AudioApi(client),
+    syncApi: SyncApi(client),
+  );
 }
 
 void main() {
@@ -153,5 +170,61 @@ void main() {
 
     expect(session.sungAudioBytes, isNull);
     expect(session.referenceAudioBytes, isNotNull);
+  });
+
+  test('analyzeAudio loest automatisch align() aus und befuellt alignedSungCurve (MIDI-Modus)',
+      () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+
+    expect(session.alignStatus, LoadStatus.ok);
+    expect(session.alignedSungCurve.length, 2);
+    expect(session.alignedSungCurve[0].alignedT, closeTo(0.05, 0.001));
+    expect(session.displayedSungCurve, session.alignedSungCurve);
+  });
+
+  test('analyzeAudio loest align() im Referenz-Modus mit reference_audio aus', () async {
+    final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.recording);
+    await session.analyzeReference(Uint8List.fromList([9, 9, 9]), 'referenz.wav');
+
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+
+    expect(session.alignStatus, LoadStatus.ok);
+    expect(session.alignedSungCurve.length, 2);
+  });
+
+  test('displayedSungCurve faellt ohne Alignment auf die rohe sungCurve zurueck', () {
+    final session = _buildSession();
+    expect(session.alignedSungCurve, isEmpty);
+    expect(session.displayedSungCurve, session.sungCurve);
+  });
+
+  test('align() schlaegt im MIDI-Modus ohne ausgewaehlte Spur fehl, ohne sungCurve zu veraendern',
+      () async {
+    final session = _buildSession();
+    // Kein midiSessionId/selectedTrackIndex gesetzt.
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+
+    expect(session.audioStatus, LoadStatus.ok);
+    expect(session.alignStatus, LoadStatus.error);
+    expect(session.alignedSungCurve, isEmpty);
+    expect(session.displayedSungCurve, session.sungCurve);
+  });
+
+  test('setReferenceSource setzt alignedSungCurve/alignStatus zurueck', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+    expect(session.alignedSungCurve, isNotEmpty);
+
+    session.setReferenceSource(ReferenceSource.recording);
+
+    expect(session.alignedSungCurve, isEmpty);
+    expect(session.alignStatus, LoadStatus.idle);
   });
 }

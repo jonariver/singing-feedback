@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../api/api_client.dart';
 import '../api/audio_api.dart';
 import '../api/midi_api.dart';
+import '../api/sync_api.dart';
 import '../models/sung_point.dart';
 import '../models/target_point.dart';
 import '../models/track_candidate.dart';
@@ -18,8 +19,9 @@ enum ReferenceSource { midi, recording }
 class SessionState extends ChangeNotifier {
   final MidiApi midiApi;
   final AudioApi audioApi;
+  final SyncApi syncApi;
 
-  SessionState({required this.midiApi, required this.audioApi});
+  SessionState({required this.midiApi, required this.audioApi, required this.syncApi});
 
   String? midiSessionId;
   List<TrackCandidate> candidates = [];
@@ -40,6 +42,16 @@ class SessionState extends ChangeNotifier {
   String referenceMessage = '';
   Uint8List? referenceAudioBytes;
   Uint8List? sungAudioBytes;
+
+  List<SungPoint> alignedSungCurve = [];
+  LoadStatus alignStatus = LoadStatus.idle;
+  String alignMessage = '';
+
+  /// Die fuer den Chart zu zeichnende gesungene Kurve: ausgerichtet, sobald ein
+  /// Alignment vorliegt, sonst (noch nicht fertig oder fehlgeschlagen) die rohe
+  /// Kurve - kein Absturz/leerer Chart bei einem Alignment-Fehler.
+  List<SungPoint> get displayedSungCurve =>
+      alignedSungCurve.isNotEmpty ? alignedSungCurve : sungCurve;
 
   bool get audioSectionEnabled => referenceSource == ReferenceSource.midi
       ? selectedTrackIndex != null
@@ -133,14 +145,65 @@ class SessionState extends ChangeNotifier {
     sungAudioBytes = bytes;
     audioStatus = LoadStatus.loading;
     audioMessage = 'Analysiere Tonhöhe der Aufnahme…';
+    alignedSungCurve = [];
+    alignStatus = LoadStatus.idle;
+    alignMessage = '';
     notifyListeners();
     try {
       sungCurve = await audioApi.analyzeAudio(bytes, filename);
       audioStatus = LoadStatus.ok;
       audioMessage = 'Analyse fertig.';
+      notifyListeners();
+      await align();
+      return;
     } catch (e) {
       audioStatus = LoadStatus.error;
       audioMessage = 'Fehler: ${_messageOf(e)}';
+    }
+    notifyListeners();
+  }
+
+  /// Richtet die gesungene Kurve per DTW auf die Zielmelodie aus (MIDI oder
+  /// Referenzaufnahme, je nach referenceSource). Wird automatisch am Ende einer
+  /// erfolgreichen analyzeAudio() angestossen - kein manueller Button. Transpose-
+  /// Aenderungen loesen bewusst KEIN erneutes Alignment aus: onset_envelope_from_
+  /// midi_track (backend/sync/features.py) haengt nicht von transpose ab, das
+  /// Warping-Ergebnis bleibt bei einer reinen Tonhoehenverschiebung gueltig.
+  Future<void> align() async {
+    if (sungAudioBytes == null) return;
+    alignStatus = LoadStatus.loading;
+    alignMessage = 'Richte Aufnahme zeitlich aus…';
+    notifyListeners();
+    try {
+      if (referenceSource == ReferenceSource.midi) {
+        if (midiSessionId == null || selectedTrackIndex == null) {
+          throw StateError('Keine MIDI-Spur ausgewählt.');
+        }
+        alignedSungCurve = await syncApi.alignWithMidi(
+          sungAudioBytes!,
+          'gesang.wav',
+          sessionId: midiSessionId!,
+          trackIndex: selectedTrackIndex!,
+          transpose: transposeSemitones,
+        );
+      } else {
+        if (referenceAudioBytes == null) {
+          throw StateError('Keine Referenzaufnahme vorhanden.');
+        }
+        alignedSungCurve = await syncApi.alignWithReference(
+          sungAudioBytes!,
+          'gesang.wav',
+          referenceAudioBytes!,
+          'referenz.wav',
+        );
+      }
+      alignStatus = LoadStatus.ok;
+      alignMessage = 'Ausrichtung fertig.';
+    } catch (e) {
+      alignStatus = LoadStatus.error;
+      alignMessage = 'Ausrichtung fehlgeschlagen: ${_messageOf(e)}';
+      // alignedSungCurve bleibt leer - displayedSungCurve faellt automatisch auf
+      // die rohe sungCurve zurueck (siehe Getter oben).
     }
     notifyListeners();
   }
@@ -169,6 +232,9 @@ class SessionState extends ChangeNotifier {
     sungAudioBytes = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
+    alignedSungCurve = [];
+    alignStatus = LoadStatus.idle;
+    alignMessage = '';
     notifyListeners();
   }
 
@@ -179,6 +245,9 @@ class SessionState extends ChangeNotifier {
     sungAudioBytes = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
+    alignedSungCurve = [];
+    alignStatus = LoadStatus.idle;
+    alignMessage = '';
   }
 
   String _messageOf(Object e) => e is ApiException ? e.message : e.toString();
