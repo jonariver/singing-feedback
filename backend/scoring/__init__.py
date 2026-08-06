@@ -3,5 +3,6 @@ Phrasenend-Drift (Phase 4, Kernpaket). Glides, Stimmumfang, Pausen folgen spaete
 """
 
 from .notes import segment_target_notes
+from .score import score_performance
 
-__all__ = ["segment_target_notes"]
+__all__ = ["score_performance", "segment_target_notes"]

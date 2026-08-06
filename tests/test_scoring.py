@@ -266,3 +266,37 @@ def test_compute_stability_excludes_tail_even_when_tail_dominates_frame_count():
     assert stability["applicable"] is True
     assert stability["flag"] is False
     assert stability["mad_cents"] < 5.0
+
+
+from backend.scoring import score_performance
+
+
+def test_score_performance_raises_without_aligned_t():
+    target_curve = [{"t": 0.0, "hz": 440.0, "midi_note": 69}]
+    sung_curve = [{"t": 0.0, "hz": 440.0, "voiced": True, "confidence": 0.9}]  # kein aligned_t
+    with pytest.raises(ValueError):
+        score_performance(target_curve, sung_curve)
+
+
+def test_score_performance_empty_curves_returns_empty_result():
+    result = score_performance([], [])
+    assert result["notes"] == []
+    assert result["summary"]["note_count"] == 0
+    assert result["summary"]["problem_tags"] == []
+
+
+def test_score_performance_single_correct_note():
+    target_curve = _flat_curve(440.0, 100)
+    sung_curve = [
+        {"t": round(i * 0.01, 3), "hz": 440.0, "voiced": True, "confidence": 0.9,
+         "aligned_t": round(i * 0.01, 3)}
+        for i in range(100)
+    ]
+    result = score_performance(target_curve, sung_curve)
+    assert len(result["notes"]) == 1
+    note = result["notes"][0]
+    assert note["missed"] is False
+    assert note["cents_deviation"]["classification"] == "green"
+    assert note["timing"]["classification"] == "on_time"
+    assert result["summary"]["cents_green"] == 1
+    assert result["summary"]["problem_tags"] == []
