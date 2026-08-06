@@ -393,4 +393,29 @@ void main() {
 
     expect(session.scoreStatus, isNot(LoadStatus.idle));
   });
+
+  test('analyzeAudio speichert den Dateinamen der Gesangsaufnahme', () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
+
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'aufnahme.m4a');
+
+    expect(session.sungAudioFilename, 'aufnahme.m4a');
+  });
+
+  test('setReferenceSource setzt sungAudioFilename zurueck, wenn sungAudioBytes zurueckgesetzt wird',
+      () async {
+    final session = _buildSession();
+    session.midiSessionId = 'sess-1';
+    session.selectedTrackIndex = 0;
+    session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
+    await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'aufnahme.m4a');
+    expect(session.sungAudioFilename, 'aufnahme.m4a');
+
+    session.setReferenceSource(ReferenceSource.recording);
+
+    expect(session.sungAudioFilename, isNull);
+  });
 }

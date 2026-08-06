@@ -50,6 +50,7 @@ class SessionState extends ChangeNotifier {
   String referenceMessage = '';
   Uint8List? referenceAudioBytes;
   Uint8List? sungAudioBytes;
+  String? sungAudioFilename;
 
   List<SungPoint> alignedSungCurve = [];
   LoadStatus alignStatus = LoadStatus.idle;
@@ -160,6 +161,7 @@ class SessionState extends ChangeNotifier {
 
   Future<void> analyzeAudio(Uint8List bytes, String filename) async {
     sungAudioBytes = bytes;
+    sungAudioFilename = filename;
     audioStatus = LoadStatus.loading;
     audioMessage = 'Analysiere Tonhöhe der Aufnahme…';
     _resetAlignment();
@@ -275,6 +277,7 @@ class SessionState extends ChangeNotifier {
     referenceSource = source;
     sungCurve = [];
     sungAudioBytes = null;
+    sungAudioFilename = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
     _resetAlignment();
@@ -286,6 +289,7 @@ class SessionState extends ChangeNotifier {
     targetCurve = [];
     sungCurve = [];
     sungAudioBytes = null;
+    sungAudioFilename = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
     _resetAlignment();
