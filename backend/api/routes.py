@@ -118,7 +118,7 @@ def sync_align(
     transpose: int = Form(0),
     reference_audio: UploadFile | None = File(None),
 ) -> dict:
-    _reject_oversized_content_length(request, MAX_AUDIO_UPLOAD_BYTES)
+    _reject_oversized_content_length(request, 2 * MAX_AUDIO_UPLOAD_BYTES)
 
     sung_bytes = sung_audio.file.read()
     if len(sung_bytes) > MAX_AUDIO_UPLOAD_BYTES:
