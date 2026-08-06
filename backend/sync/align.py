@@ -5,6 +5,8 @@ from __future__ import annotations
 import librosa
 import numpy as np
 
+from backend.config import DTW_BAND_RADIUS
+
 # Ziel darf hoechstens so viel laenger sein als die Aufnahme, bevor align_curves()
 # verweigert wird (siehe duration_ratio_exceeds_limit unten fuer die Begruendung).
 MAX_DURATION_RATIO = 3.0
@@ -60,7 +62,10 @@ def align_curves(
 
     x = _zscore(target_envelope)[None, :]
     y = _zscore(sung_envelope)[None, :]
-    _, wp = librosa.sequence.dtw(X=x, Y=y, metric="euclidean", subseq=False, backtrack=True)
+    _, wp = librosa.sequence.dtw(
+        X=x, Y=y, metric="euclidean", subseq=False, backtrack=True,
+        global_constraints=True, band_rad=DTW_BAND_RADIUS,
+    )
 
     # wp laeuft in absteigender Reihenfolge von (len(target)-1, len(sung)-1) nach (0, 0);
     # reversed(...) macht daraus die chronologische Reihenfolge. Bei mehreren

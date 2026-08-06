@@ -70,3 +70,12 @@ DRIFT_FLAG_THRESHOLD_CENTS = 30.0
 MAX_SCORE_CURVE_FRAMES = 20000  # ~200s bei 100Hz, grosszuegig ueber MAX_AUDIO_SECONDS
 
 MAX_SCORE_REQUEST_BYTES = 20 * 1024 * 1024  # grosszuegig ueber dem realistischen JSON-Volumen bei MAX_SCORE_CURVE_FRAMES
+
+# DTW-Ausrichtung (Phase 3): Sakoe-Chiba-Bandradius, um den Ausrichtungspfad nah an
+# der Diagonale zu halten. Ohne Begrenzung kann der Pfad in laengeren, echten
+# Aufnahmen mit Pausen/stillen Abschnitten (wenig Onset-Signal als Kostendruck)
+# beliebig weit "wegdriften" - real beobachtet: bis zu 18.7s Verschiebung auf einer
+# 61s-Aufnahme mit 20s Stille (siehe docs/superpowers/specs/2026-08-06-dtw-drift-band-fix-design.md).
+# Bruchteil der kuerzeren Kurvenlaenge (radius_frames = int(band_rad * min(len(X), len(Y)))),
+# skaliert also automatisch mit der Aufnahmedauer.
+DTW_BAND_RADIUS = 0.1
