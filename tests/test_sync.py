@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pretty_midi
 import pytest
 
+from backend.audio_io import load_audio_signal
+from backend.pitch_detection import pitch_curve_from_signal
 from backend.sync import (
     MAX_DURATION_RATIO,
     align_curves,
@@ -14,6 +18,10 @@ from backend.sync import (
     onset_envelope_from_signal,
 )
 from backend.midi_analysis import track_pitch_curve
+
+from .fixtures.generate_fixtures import generate_pause_test_wav
+
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
 def _two_note_pm() -> pretty_midi.PrettyMIDI:
@@ -127,3 +135,50 @@ def test_duration_ratio_exceeds_limit_ignores_zero_or_negative_durations():
     # bereits andere Fehlerpfade (leere Kurve -> align_curves() liefert leeres Ergebnis).
     assert duration_ratio_exceeds_limit(target_duration=0.0, sung_duration=10.0) is False
     assert duration_ratio_exceeds_limit(target_duration=10.0, sung_duration=0.0) is False
+
+
+def test_align_curves_self_alignment_stays_near_zero_through_a_long_pause():
+    """Realer Bug: DTW driftete auf einer 61s-Aufnahme mit 20s Stille um bis zu 18.7s
+    (siehe docs/superpowers/specs/2026-08-06-dtw-drift-band-fix-design.md).
+
+    Reproduziert das in Miniatur: eine durchgehende Zielspur (Referenz/Instrumental
+    laeuft weiter) gegen eine Gesangsspur mit einer echten 12s-Stille (Saenger
+    pausiert) - beide teilen dieselben Randnoten vor/nach der Luecke. Ein sauber
+    funktionierendes Alignment sollte `aligned_t - t` auch waehrend/nach der Pause in
+    einer plausiblen Groessenordnung halten (siehe Design-Dokument, Abschnitt
+    "Kalibrierung des Bandradius": einstellige Sekundenzahl, nicht die beobachteten
+    ~19s).
+
+    Hinweis zur Abweichung vom urspruenglichen Plan: eine woertliche "Selbst-
+    Ausrichtung" (identisches Kurven-/Huellkurven-Objekt fuer Ziel UND Gesang) wurde
+    zuerst probiert, reproduziert den Bug aber nie - der DTW-Diagonalpfad hat dann per
+    Konstruktion immer Gesamtkosten 0 und ist damit stets (mindestens) gleich gut wie
+    jede Abweichung, librosa's Backtracking loest das konsistent zugunsten der
+    Diagonale auf (max_drift exakt 0.0, gemessen ueber Pausenlaengen von 12-30s). Siehe
+    Task-1-Report fuer die Messwerte sowie generate_fixtures.py fuer den Kommentar zur
+    Fixture."""
+    target_path, sung_path = generate_pause_test_wav(FIXTURES_DIR)
+
+    target_y, target_sr = load_audio_signal(
+        target_path.read_bytes(), filename_hint="test_pause_target.wav"
+    )
+    target_curve = pitch_curve_from_signal(target_y, target_sr, frame_rate_hz=100.0)
+    target_envelope = onset_envelope_from_signal(target_y, target_sr, frame_rate_hz=100.0)
+
+    sung_y, sung_sr = load_audio_signal(
+        sung_path.read_bytes(), filename_hint="test_pause_sung.wav"
+    )
+    sung_curve = pitch_curve_from_signal(sung_y, sung_sr, frame_rate_hz=100.0)
+    sung_envelope = onset_envelope_from_signal(sung_y, sung_sr, frame_rate_hz=100.0)
+
+    result = align_curves(target_curve, target_envelope, sung_curve, sung_envelope)
+    aligned = result["sung_curve"]
+
+    deltas = [abs(f["aligned_t"] - f["t"]) for f in aligned if f["aligned_t"] is not None]
+    assert deltas, "kein einziger Frame wurde ausgerichtet - Fixture oder Pipeline kaputt"
+    max_drift = max(deltas)
+    assert max_drift < 1.0, (
+        f"Ausrichtung sollte auch durch die Gesangspause hindurch nahe an der "
+        f"Diagonale bleiben (Drift < 1s), tatsaechlich max. {max_drift:.2f}s - DTW "
+        f"driftet waehrend/nach der Pause."
+    )

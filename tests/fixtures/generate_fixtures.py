@@ -123,3 +123,100 @@ if __name__ == "__main__":
     midi_path, wav_path = generate()
     print(f"Erzeugt: {midi_path}")
     print(f"Erzeugt: {wav_path}")
+
+
+# --- Pausen-Fixture (Bugfix: DTW-Drift bei Pausen, Phase 3) ---
+#
+# Simuliert einen Instrumentalteil (der reale, auf einem Telefon beobachtete Fall:
+# 61s-Aufnahme mit 20s Stille, bis zu 18.7s DTW-Drift).
+#
+# Abweichung von der urspruenglich geplanten Herangehensweise (siehe Implementierungs-
+# plan/Task-1-Brief): dort war eine reine "Selbst-Ausrichtung" vorgesehen - dieselbe
+# Kurve/Huellkurve wortwoertlich (dasselbe Python-Objekt) sowohl als Ziel- wie auch als
+# Gesangskurve an align_curves() uebergeben. Das erwies sich beim Ausprobieren als
+# fundamental untauglich, den Bug zu reproduzieren, und zwar unabhaengig von
+# Pausenlaenge/Melodie: wenn Ziel- und Gesangs-Huellkurve identisch sind, hat der
+# DTW-Diagonalpfad IMMER Gesamtkosten 0 (jede Abweichung von der Diagonale kann
+# hoechstens gleich gute, nie bessere Kosten erreichen) - librosa.sequence.dtw's
+# Backtracking loest diesen (auch bei 12-30s Pause reproduzierbar getesteten) Fall
+# konsistent zugunsten der Diagonale auf, siehe Task-1-Report fuer die Messwerte. Das
+# stimmt mit der Kalibrierungs-Anleitung im Design-Dokument
+# (docs/superpowers/specs/2026-08-06-dtw-drift-band-fix-design.md, Abschnitt
+# "Kalibrierung des Bandradius") ueberein, die fuer die Pausen-Fixture explizit "eine
+# eingebaute stille Luecke ... in der gesungenen Spur (nicht in der Zielspur)" verlangt.
+#
+# Deshalb baut diese Fixture zwei tatsaechlich unterschiedliche Aufnahmen: eine
+# durchgehende "Ziel"/Referenzspur (spielt ueber die volle Dauer, wie ein Instrumental-
+# Playback, das waehrend der Gesangspause weiterlaeuft) und eine "Gesangs"-Spur mit
+# einer echten 12s-Stille in der Mitte (der Saenger pausiert, wie im real beobachteten
+# Fall). Nur so entsteht ein echtes, deterministisches Kostengefaelle, das den
+# unbegrenzten DTW-Pfad zum Wegdriften bringt (siehe Task-1-Report: reproduzierbar
+# mehrere Sekunden Drift statt exakt 0.0).
+
+PAUSE_TEST_TOTAL_DURATION = 24.0
+
+# Gesangsspur: kurze Melodie vor und nach einer echten 12s-Stille (Saenger pausiert).
+_PAUSE_SUNG_MELODY = [
+    (0.0, 2.0, 60),   # C4
+    (2.0, 2.0, 64),   # E4
+    (4.0, 2.0, 67),   # G4
+    # 6.0-18.0s: Stille (Saenger pausiert, 12s Luecke)
+    (18.0, 2.0, 67),  # G4
+    (20.0, 2.0, 64),  # E4
+    (22.0, 2.0, 60),  # C4
+]
+
+# Zielspur/Referenz: durchgehendes "Instrumental", das auch waehrend der Gesangspause
+# weiterspielt - dieselben Randnoten wie die Gesangsspur, plus Fuellnoten in der Luecke.
+_PAUSE_TARGET_MELODY = [
+    (0.0, 2.0, 60),   # C4
+    (2.0, 2.0, 64),   # E4
+    (4.0, 2.0, 67),   # G4
+    (6.0, 2.0, 69),   # A4
+    (8.0, 2.0, 67),   # G4
+    (10.0, 2.0, 64),  # E4
+    (12.0, 2.0, 62),  # D4
+    (14.0, 2.0, 64),  # E4
+    (16.0, 2.0, 67),  # G4
+    (18.0, 2.0, 67),  # G4
+    (20.0, 2.0, 64),  # E4
+    (22.0, 2.0, 60),  # C4
+]
+
+
+def _build_wav_from_melody(melody: list[tuple[float, float, int]], sr: int) -> np.ndarray:
+    audio = np.zeros(int(PAUSE_TEST_TOTAL_DURATION * sr) + 1)
+    for start, duration, note in melody:
+        base_hz = pretty_midi.note_number_to_hz(note)
+        freq_fn = lambda t, hz=base_hz: np.full_like(t, hz)
+        segment = _sine_segment(freq_fn, duration, sr)
+        start_sample = int(start * sr)
+        end_sample = start_sample + len(segment)
+        if end_sample > len(audio):
+            audio = np.pad(audio, (0, end_sample - len(audio)))
+        audio[start_sample:end_sample] += segment
+    return audio
+
+
+def build_pause_test_target_wav(sr: int = SAMPLE_RATE) -> np.ndarray:
+    """Durchgehende Referenzspur (kein Gesangspausen-Loch) fuer die Pausen-Fixture."""
+    return _build_wav_from_melody(_PAUSE_TARGET_MELODY, sr)
+
+
+def build_pause_test_sung_wav(sr: int = SAMPLE_RATE) -> np.ndarray:
+    """Gesangsspur mit einer echten 12s-Stille in der Mitte fuer die Pausen-Fixture."""
+    return _build_wav_from_melody(_PAUSE_SUNG_MELODY, sr)
+
+
+def generate_pause_test_wav(output_dir: Path = FIXTURES_DIR) -> tuple[Path, Path]:
+    """Erzeugt die zwei WAVs der Pausen-Fixture und gibt (target_path, sung_path)
+    zurueck."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    target_path = output_dir / "test_pause_target.wav"
+    sf.write(str(target_path), build_pause_test_target_wav(), SAMPLE_RATE)
+
+    sung_path = output_dir / "test_pause_sung.wav"
+    sf.write(str(sung_path), build_pause_test_sung_wav(), SAMPLE_RATE)
+
+    return target_path, sung_path
