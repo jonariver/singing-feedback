@@ -66,10 +66,11 @@ class _CurvePoint {
 }
 
 /// Port von drawChart()/drawCurve() aus frontend/app.js: Notennamen-Y-Achse mit
-/// Oktavlinien, Zeit-X-Achse, Ziel- (teal) und Ist-Kurve (orange) ueberlagert, mit
-/// Luecken bei fehlenden bzw. unvoiced Punkten. Die Zielkurvenfarbe weicht bewusst
-/// von frontend/app.js ab (dort weiterhin blau), da nur der Mobile-Client im Zuge
-/// des Dark-Teal-Redesigns umgefaerbt wurde.
+/// Oktavlinien, Zeit-X-Achse, Ziel- (teal) und Ist-Kurve ueberlagert, mit Luecken
+/// bei fehlenden bzw. unvoiced Punkten. Die Ist-Kurve ist segment-farbig (gruen/gelb/rot)
+/// nach Cent-Klassifizierung, wenn noteColorRanges vorhanden (Phase 5); sonst fallback
+/// auf orange. Die Zielkurvenfarbe weicht bewusst von frontend/app.js ab (dort weiterhin blau),
+/// da nur der Mobile-Client im Zuge des Dark-Teal-Redesigns umgefaerbt wurde.
 class PitchChart extends StatelessWidget {
   final List<TargetPoint> targetCurve;
   final List<SungPoint> sungCurve;

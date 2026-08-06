@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/score_result.dart';
 
 /// Einfache Text-/Zahlen-Zusammenfassung der Bewertungs-Engine (Phase 4,
-/// Kernpaket) - bewusst OHNE Kurvenfaerbung im Chart (das ist die spaetere,
-/// separate Phase 5). Eine Zeile pro Note plus eine Zusammenfassungszeile.
+/// Kernpaket). Kurvenfaerbung im Chart erfolgt in PitchChart (colorForSungPoint,
+/// _drawCurve). Diese View bleibt bewusst text-only. Eine Zeile pro Note plus eine Zusammenfassungszeile.
 class ScoreSummaryView extends StatelessWidget {
   final ScoreResult result;
 
