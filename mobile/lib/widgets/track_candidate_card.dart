@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/track_candidate.dart';
+import 'track_preview_button.dart';
 
 /// Farbcodierung des 0-100 Heuristik-Scores, identisch zum bestehenden
 /// Gruen/Gelb/Rot-Schema aus PitchChart/ScoreSummaryView.
@@ -70,9 +71,20 @@ class TrackCandidateCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: candidate.noteCount == 0 ? null : onSelect,
-              child: const Text('Auswählen & anhören'),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: candidate.noteCount == 0 ? null : onSelect,
+                    child: const Text('Auswählen'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 140),
+                  child: TrackPreviewButton(trackIndex: candidate.index),
+                ),
+              ],
             ),
           ],
         ),
