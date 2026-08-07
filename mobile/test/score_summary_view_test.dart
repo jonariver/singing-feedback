@@ -58,6 +58,26 @@ ScoreResult _resultWith(ScoreNote note) {
   );
 }
 
+ScoreResult _resultWithVocalRange(VocalRange vocalRange) {
+  return ScoreResult(
+    notes: const [],
+    summary: ScoreSummary(
+      noteCount: 0,
+      missedCount: 0,
+      centsGreen: 0,
+      centsYellow: 0,
+      centsRed: 0,
+      timingFlaggedCount: 0,
+      stabilityFlaggedCount: 0,
+      phraseEndDriftFlaggedCount: 0,
+      glideFlaggedCount: 0,
+      overallScore: 100.0,
+      problemTags: const [],
+      vocalRange: vocalRange,
+    ),
+  );
+}
+
 void main() {
   testWidgets('zeigt "gerutscht (von unten)" fuer eine Note mit Glide von unten',
       (tester) async {
@@ -73,5 +93,50 @@ void main() {
       home: Scaffold(body: ScoreSummaryView(result: _resultWith(_glideNote(direction: 'down')))),
     ));
     expect(find.textContaining('gerutscht (von oben)'), findsOneWidget);
+  });
+
+  testWidgets('zeigt Stimmumfang, wenn vocalRange.applicable true ist', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ScoreSummaryView(
+          result: _resultWithVocalRange(const VocalRange(
+            applicable: true,
+            minHz: 196.5,
+            maxHz: 587.3,
+            minMidiNote: 55,
+            maxMidiNote: 74,
+          )),
+        ),
+      ),
+    ));
+    expect(find.textContaining('Stimmumfang: G3–D5'), findsOneWidget);
+  });
+
+  testWidgets('zeigt keinen Stimmumfang-Hinweis, wenn vocalRange.applicable false ist',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ScoreSummaryView(
+          result: _resultWithVocalRange(const VocalRange(
+            applicable: false,
+            minHz: null,
+            maxHz: null,
+            minMidiNote: null,
+            maxMidiNote: null,
+          )),
+        ),
+      ),
+    ));
+    expect(find.textContaining('Stimmumfang'), findsNothing);
+  });
+
+  test('midiNoteName formatiert C4/A4 korrekt', () {
+    expect(midiNoteName(60), 'C4');
+    expect(midiNoteName(69), 'A4');
+  });
+
+  test('midiNoteName behandelt Oktavgrenzen korrekt', () {
+    expect(midiNoteName(59), 'B3');
+    expect(midiNoteName(72), 'C5');
   });
 }

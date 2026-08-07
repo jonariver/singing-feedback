@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../models/score_result.dart';
 
+const _midiNoteNames = [
+  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
+];
+
+String midiNoteName(int midiNote) {
+  final octave = (midiNote ~/ 12) - 1;
+  final name = _midiNoteNames[midiNote % 12];
+  return '$name$octave';
+}
+
 /// Einfache Text-/Zahlen-Zusammenfassung der Bewertungs-Engine (Phase 4,
 /// Kernpaket). Kurvenfaerbung im Chart erfolgt in PitchChart (colorForSungPoint,
 /// _drawCurve). Diese View bleibt bewusst text-only. Eine Zeile pro Note plus eine Zusammenfassungszeile.
@@ -64,6 +74,15 @@ class ScoreSummaryView extends StatelessWidget {
               .bodyMedium
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
+        if (result.summary.vocalRange.applicable)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Stimmumfang: '
+              '${midiNoteName(result.summary.vocalRange.minMidiNote!)}'
+              '–${midiNoteName(result.summary.vocalRange.maxMidiNote!)}',
+            ),
+          ),
       ],
     );
   }
