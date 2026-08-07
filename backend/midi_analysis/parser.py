@@ -13,12 +13,22 @@ from dataclasses import dataclass, field
 
 import pretty_midi
 
+from backend.config import (
+    TRACK_SCORE_DENSITY_MAX_NOTES_PER_SEC,
+    TRACK_SCORE_DENSITY_MIN_NOTES_PER_SEC,
+    TRACK_SCORE_DURATION_RATIO_FULL_SCORE,
+    TRACK_SCORE_VOCAL_RANGE_MIDI_MAX,
+    TRACK_SCORE_VOCAL_RANGE_MIDI_MIN,
+)
+
 # Namen, nach denen bevorzugt gesucht wird (siehe Anforderung).
 VOCAL_NAME_HINTS = ("vocal", "voice", "lead", "melody", "gesang", "vox", "singer")
 
 # Ein Track mit weniger Noten als das ist fuer eine Gesangsmelodie kaum plausibel
 # (reine Ein-Ton-Effektspuren o.ae.); grobe Phase-1-Grenze, keine echte Kalibrierung.
 MIN_PLAUSIBLE_NOTE_COUNT = 4
+
+_SCORE_WEIGHT = 20.0
 
 
 @dataclass
@@ -34,6 +44,7 @@ class TrackCandidate:
     monophonic: bool
     name_hint_match: bool
     plausible: bool
+    score: float = 0.0
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -53,6 +64,7 @@ class TrackCandidate:
             "monophonic": bool(self.monophonic),
             "name_hint_match": bool(self.name_hint_match),
             "plausible": bool(self.plausible),
+            "score": round(float(self.score), 1),
             "warnings": self.warnings,
         }
 
@@ -76,6 +88,61 @@ def _is_monophonic(notes: list[pretty_midi.Note], overlap_tolerance: float = 0.0
         if cur.start < prev.end - overlap_tolerance:
             overlaps += 1
     return (overlaps / max(1, len(sorted_notes) - 1)) < 0.1
+
+
+def _pitch_range_fraction(pitch_min: int, pitch_max: int) -> float:
+    """Anteil von [pitch_min, pitch_max], der innerhalb des grosszuegigen
+    Gesangsfensters liegt (1.0 = komplett drin, 0.0 = komplett draussen)."""
+    lo = max(pitch_min, TRACK_SCORE_VOCAL_RANGE_MIDI_MIN)
+    hi = min(pitch_max, TRACK_SCORE_VOCAL_RANGE_MIDI_MAX)
+    overlap = max(0, hi - lo + 1)
+    span = pitch_max - pitch_min + 1
+    return overlap / span
+
+
+def _note_density_fraction(note_count: int, duration_seconds: float) -> float:
+    """Volle Punktzahl im plausiblen Notendichte-Fenster, linearer Abfall auf 0
+    ausserhalb in beide Richtungen."""
+    if duration_seconds <= 0:
+        return 0.0
+    density = note_count / duration_seconds
+    if density < TRACK_SCORE_DENSITY_MIN_NOTES_PER_SEC:
+        return max(0.0, density / TRACK_SCORE_DENSITY_MIN_NOTES_PER_SEC)
+    if density <= TRACK_SCORE_DENSITY_MAX_NOTES_PER_SEC:
+        return 1.0
+    falloff_range = TRACK_SCORE_DENSITY_MAX_NOTES_PER_SEC
+    return max(0.0, 1.0 - (density - TRACK_SCORE_DENSITY_MAX_NOTES_PER_SEC) / falloff_range)
+
+
+def _duration_ratio_fraction(duration_seconds: float, longest_duration_seconds: float) -> float:
+    """Volle Punktzahl ab TRACK_SCORE_DURATION_RATIO_FULL_SCORE Anteil an der
+    laengsten Spur der Datei (Proxy fuer die Songlaenge)."""
+    if longest_duration_seconds <= 0:
+        return 0.0
+    ratio = duration_seconds / longest_duration_seconds
+    return min(1.0, ratio / TRACK_SCORE_DURATION_RATIO_FULL_SCORE)
+
+
+def _compute_score(
+    *,
+    is_drum: bool,
+    note_count: int,
+    pitch_min: int | None,
+    pitch_max: int | None,
+    duration_seconds: float,
+    monophonic: bool,
+    name_hint_match: bool,
+    longest_duration_seconds: float,
+) -> float:
+    if is_drum or note_count == 0 or pitch_min is None or pitch_max is None:
+        return 0.0
+    score = 0.0
+    score += _SCORE_WEIGHT if name_hint_match else 0.0
+    score += _SCORE_WEIGHT if monophonic else 0.0
+    score += _SCORE_WEIGHT * _pitch_range_fraction(pitch_min, pitch_max)
+    score += _SCORE_WEIGHT * _note_density_fraction(note_count, duration_seconds)
+    score += _SCORE_WEIGHT * _duration_ratio_fraction(duration_seconds, longest_duration_seconds)
+    return score
 
 
 def list_track_candidates(pm: pretty_midi.PrettyMIDI) -> list[TrackCandidate]:
@@ -123,9 +190,23 @@ def list_track_candidates(pm: pretty_midi.PrettyMIDI) -> list[TrackCandidate]:
             name_hint_match=name_hint_match, plausible=plausible, warnings=warnings,
         ))
 
-    # Name-Treffer + monophon + plausibel zuerst, damit die wahrscheinlichste
-    # Gesangsspur im Frontend oben steht (der Nutzer waehlt trotzdem selbst).
-    candidates.sort(key=lambda c: (not c.name_hint_match, not c.plausible, not c.monophonic, -c.note_count))
+    longest_duration_seconds = max((c.duration_seconds for c in candidates), default=0.0)
+    for c in candidates:
+        c.score = _compute_score(
+            is_drum=c.is_drum,
+            note_count=c.note_count,
+            pitch_min=c.pitch_min,
+            pitch_max=c.pitch_max,
+            duration_seconds=c.duration_seconds,
+            monophonic=c.monophonic,
+            name_hint_match=c.name_hint_match,
+            longest_duration_seconds=longest_duration_seconds,
+        )
+
+    # Score fasst Namenstreffer/Monophonie/Stimmumfang/Notendichte/Dauer-Plausibilitaet
+    # zusammen, damit die wahrscheinlichste Gesangsspur oben steht (der Nutzer waehlt
+    # trotzdem selbst).
+    candidates.sort(key=lambda c: -c.score)
     return candidates
 
 

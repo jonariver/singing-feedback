@@ -80,3 +80,108 @@ def test_drum_and_polyphonic_tracks_are_marked_implausible():
     assert by_name["Piano"].monophonic is False
     assert by_name["Piano"].plausible is True  # nicht per se implausibel, aber Warnung vorhanden
     assert any("polyphon" in w for w in by_name["Piano"].warnings)
+
+
+def test_score_rewards_name_hint_match():
+    import pretty_midi
+
+    pm = pretty_midi.PrettyMIDI()
+    for name in ("Vocal", "Synth"):
+        inst = pretty_midi.Instrument(program=0, name=name)
+        for i in range(8):
+            inst.notes.append(pretty_midi.Note(velocity=90, pitch=60, start=i * 0.5, end=i * 0.5 + 0.4))
+        pm.instruments.append(inst)
+
+    candidates = list_track_candidates(pm)
+    by_name = {c.name: c for c in candidates}
+    assert by_name["Vocal"].score - by_name["Synth"].score == 20.0
+
+
+def test_score_rewards_monophonic_over_polyphonic():
+    import pretty_midi
+
+    pm = pretty_midi.PrettyMIDI()
+    mono = pretty_midi.Instrument(program=0, name="Mono")
+    for i in range(8):
+        mono.notes.append(pretty_midi.Note(velocity=90, pitch=60, start=i * 0.5, end=i * 0.5 + 0.4))
+    pm.instruments.append(mono)
+
+    poly = pretty_midi.Instrument(program=0, name="Poly")
+    for i in range(8):
+        for pitch in (60, 64, 67):
+            poly.notes.append(pretty_midi.Note(velocity=90, pitch=pitch, start=i * 0.5, end=i * 0.5 + 0.4))
+    pm.instruments.append(poly)
+
+    candidates = list_track_candidates(pm)
+    by_name = {c.name: c for c in candidates}
+    assert by_name["Mono"].score > by_name["Poly"].score
+
+
+def test_score_is_zero_for_drum_tracks():
+    import pretty_midi
+
+    pm = pretty_midi.PrettyMIDI()
+    drum = pretty_midi.Instrument(program=0, is_drum=True, name="Drums")
+    for i in range(4):
+        drum.notes.append(pretty_midi.Note(velocity=90, pitch=36, start=i * 0.2, end=i * 0.2 + 0.1))
+    pm.instruments.append(drum)
+
+    candidates = list_track_candidates(pm)
+    assert candidates[0].score == 0.0
+
+
+def test_score_rewards_pitch_within_vocal_window():
+    import pretty_midi
+
+    pm = pretty_midi.PrettyMIDI()
+    in_range = pretty_midi.Instrument(program=0, name="InRange")
+    for i in range(8):
+        in_range.notes.append(pretty_midi.Note(velocity=90, pitch=60, start=i * 0.5, end=i * 0.5 + 0.4))
+    pm.instruments.append(in_range)
+
+    out_of_range = pretty_midi.Instrument(program=0, name="OutOfRange")
+    for i in range(8):
+        out_of_range.notes.append(pretty_midi.Note(velocity=90, pitch=100, start=i * 0.5, end=i * 0.5 + 0.4))
+    pm.instruments.append(out_of_range)
+
+    candidates = list_track_candidates(pm)
+    by_name = {c.name: c for c in candidates}
+    assert by_name["InRange"].score > by_name["OutOfRange"].score
+
+
+def test_score_rewards_duration_closer_to_longest_track():
+    import pretty_midi
+
+    pm = pretty_midi.PrettyMIDI()
+    long_track = pretty_midi.Instrument(program=0, name="Long")
+    for i in range(20):
+        long_track.notes.append(pretty_midi.Note(velocity=90, pitch=60, start=i * 0.5, end=i * 0.5 + 0.4))
+    pm.instruments.append(long_track)  # ~9.9s Dauer
+
+    short_track = pretty_midi.Instrument(program=0, name="Short")
+    for i in range(4):
+        short_track.notes.append(pretty_midi.Note(velocity=90, pitch=60, start=i * 0.5, end=i * 0.5 + 0.4))
+    pm.instruments.append(short_track)  # ~1.9s Dauer, deutlich unter 30% von 9.9s
+
+    candidates = list_track_candidates(pm)
+    by_name = {c.name: c for c in candidates}
+    assert by_name["Long"].score > by_name["Short"].score
+
+
+def test_score_penalizes_very_high_note_density():
+    import pretty_midi
+
+    pm = pretty_midi.PrettyMIDI()
+    normal = pretty_midi.Instrument(program=0, name="Normal")
+    for i in range(8):
+        normal.notes.append(pretty_midi.Note(velocity=90, pitch=60, start=i * 0.5, end=i * 0.5 + 0.4))
+    pm.instruments.append(normal)  # ~2 Noten/Sek, im Zielfenster
+
+    dense = pretty_midi.Instrument(program=0, name="Dense")
+    for i in range(80):
+        dense.notes.append(pretty_midi.Note(velocity=90, pitch=60, start=i * 0.05, end=i * 0.05 + 0.04))
+    pm.instruments.append(dense)  # ~20 Noten/Sek, deutlich ueber dem Zielfenster
+
+    candidates = list_track_candidates(pm)
+    by_name = {c.name: c for c in candidates}
+    assert by_name["Normal"].score > by_name["Dense"].score

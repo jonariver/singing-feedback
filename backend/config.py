@@ -81,3 +81,12 @@ MAX_SCORE_REQUEST_BYTES = 20 * 1024 * 1024  # grosszuegig ueber dem realistische
 # erweitert das Band zusaetzlich um |len(X) - len(Y)|, wenn die beiden Kurven
 # unterschiedlich lang sind.
 DTW_BAND_RADIUS = 0.1
+
+# Spurerkennung (Phase 2): Gewichteter Score je Kandidat (0-100), ersetzt die reine
+# Tuple-Sortierung aus Phase 1. Siehe
+# docs/superpowers/specs/2026-08-07-track-scoring-and-preview-design.md.
+TRACK_SCORE_VOCAL_RANGE_MIDI_MIN = 43  # ~G2, grosszuegige untere Grenze
+TRACK_SCORE_VOCAL_RANGE_MIDI_MAX = 84  # ~C6, grosszuegige obere Grenze
+TRACK_SCORE_DENSITY_MIN_NOTES_PER_SEC = 0.5
+TRACK_SCORE_DENSITY_MAX_NOTES_PER_SEC = 4.0
+TRACK_SCORE_DURATION_RATIO_FULL_SCORE = 0.3  # ab 30% der laengsten Spur volle Punktzahl
