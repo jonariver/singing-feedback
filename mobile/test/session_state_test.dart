@@ -45,6 +45,8 @@ class _FakeApiClient extends ApiClient {
         {'t': 0.0, 'hz': 440.0, 'voiced': true, 'confidence': 0.9},
         {'t': 0.01, 'hz': null, 'voiced': false, 'confidence': 0.0},
       ],
+      'truncated': false,
+      'original_duration_seconds': 0.02,
     };
   }
 
@@ -113,6 +115,30 @@ class _FakeApiClient extends ApiClient {
   Future<Uint8List> getBytes(String path, {Map<String, String>? query}) async {
     getBytesCallCount++;
     return Uint8List.fromList([1, 2, 3, 4]);
+  }
+}
+
+class _TruncatingFakeApiClient extends ApiClient {
+  _TruncatingFakeApiClient() : super(baseUrl: 'http://fake.local');
+
+  @override
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required String fieldName,
+    required Uint8List bytes,
+    required String filename,
+    Map<String, String>? fields,
+    String? secondFieldName,
+    Uint8List? secondBytes,
+    String? secondFilename,
+  }) async {
+    return {
+      'curve': [
+        {'t': 0.0, 'hz': 440.0, 'voiced': true, 'confidence': 0.9},
+      ],
+      'truncated': true,
+      'original_duration_seconds': 116.0,
+    };
   }
 }
 
@@ -748,6 +774,48 @@ void main() {
       await session.uploadMidi(Uint8List.fromList([9, 9, 9]), 'song.mid');
 
       expect(session.cachedPreviewBytes(0), isNull);
+    });
+  });
+
+  group('SessionState Aufnahme-Kuerzung', () {
+    test('formatDurationMinSec formatiert Sekunden als m:ss', () {
+      expect(formatDurationMinSec(0.0), '0:00');
+      expect(formatDurationMinSec(59.0), '0:59');
+      expect(formatDurationMinSec(60.0), '1:00');
+      expect(formatDurationMinSec(116.0), '1:56');
+    });
+
+    test('analyzeAudio() setzt audioTruncated und die Warnmeldung, wenn gekuerzt wurde', () async {
+      final client = _TruncatingFakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+
+      await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.m4a');
+
+      expect(session.audioTruncated, isTrue);
+      expect(session.audioStatus, LoadStatus.warning);
+      expect(session.audioMessage, contains('1:56'));
+    });
+
+    test('analyzeAudio() setzt audioTruncated NICHT, wenn nicht gekuerzt wurde', () async {
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+
+      await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.m4a');
+
+      expect(session.audioTruncated, isFalse);
+      expect(session.audioStatus, LoadStatus.ok);
     });
   });
 }

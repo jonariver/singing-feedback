@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import '../models/sung_point.dart';
+import '../models/audio_analysis_result.dart';
 import 'api_client.dart';
 
 class AudioApi {
@@ -8,14 +8,13 @@ class AudioApi {
 
   AudioApi(this._client);
 
-  Future<List<SungPoint>> analyzeAudio(Uint8List bytes, String filename) async {
+  Future<AudioAnalysisResult> analyzeAudio(Uint8List bytes, String filename) async {
     final json = await _client.postMultipart(
       '/api/audio/analyze',
       fieldName: 'file',
       bytes: bytes,
       filename: filename,
     );
-    final curve = (json['curve'] as List).cast<Map<String, dynamic>>();
-    return curve.map(SungPoint.fromJson).toList();
+    return AudioAnalysisResult.fromJson(json);
   }
 }

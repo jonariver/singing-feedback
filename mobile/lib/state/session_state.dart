@@ -16,9 +16,18 @@ import '../models/sung_point.dart';
 import '../models/target_point.dart';
 import '../models/track_candidate.dart';
 
-enum LoadStatus { idle, loading, ok, error }
+enum LoadStatus { idle, loading, ok, warning, error }
 
 enum ReferenceSource { midi, recording }
+
+/// Formatiert eine Sekundenzahl als m:ss, z.B. fuer Kuerzungs-Warnmeldungen
+/// ("Aufnahme war 1:56 lang..."). Rundet auf ganze Sekunden.
+String formatDurationMinSec(double seconds) {
+  final totalSeconds = seconds.round();
+  final minutes = totalSeconds ~/ 60;
+  final secs = totalSeconds % 60;
+  return '$minutes:${secs.toString().padLeft(2, '0')}';
+}
 
 /// Duenne Abstraktion ueber die Audio-Wiedergabe, injizierbar fuer Tests. Lebt hier
 /// (nicht mehr in playback_button.dart), weil SessionState jetzt den einen zentralen
@@ -180,6 +189,8 @@ class SessionState extends ChangeNotifier {
   Uint8List? referenceAudioBytes;
   Uint8List? sungAudioBytes;
   String? sungAudioFilename;
+  bool audioTruncated = false;
+  bool referenceTruncated = false;
 
   List<SungPoint> alignedSungCurve = [];
   LoadStatus alignStatus = LoadStatus.idle;
@@ -323,9 +334,14 @@ class SessionState extends ChangeNotifier {
     _resetAlignment();
     notifyListeners();
     try {
-      sungCurve = await audioApi.analyzeAudio(bytes, filename);
-      audioStatus = LoadStatus.ok;
-      audioMessage = 'Analyse fertig.';
+      final result = await audioApi.analyzeAudio(bytes, filename);
+      sungCurve = result.curve;
+      audioTruncated = result.truncated;
+      audioStatus = result.truncated ? LoadStatus.warning : LoadStatus.ok;
+      audioMessage = result.truncated
+          ? 'Analyse fertig. Achtung: Aufnahme war '
+              '${formatDurationMinSec(result.originalDurationSeconds)} lang und wurde gekürzt.'
+          : 'Analyse fertig.';
       notifyListeners();
       await align();
       return;
@@ -445,10 +461,15 @@ class SessionState extends ChangeNotifier {
     _resetAlignment();
     notifyListeners();
     try {
-      referenceRawCurve = await audioApi.analyzeAudio(bytes, filename);
-      referenceStatus = LoadStatus.ok;
-      referenceMessage =
-          'Referenz analysiert. Jetzt eine Gesangsaufnahme aufnehmen oder hochladen.';
+      final result = await audioApi.analyzeAudio(bytes, filename);
+      referenceRawCurve = result.curve;
+      referenceTruncated = result.truncated;
+      referenceStatus = result.truncated ? LoadStatus.warning : LoadStatus.ok;
+      referenceMessage = result.truncated
+          ? 'Referenz analysiert. Achtung: Aufnahme war '
+              '${formatDurationMinSec(result.originalDurationSeconds)} lang und wurde gekürzt. '
+              'Jetzt eine Gesangsaufnahme aufnehmen oder hochladen.'
+          : 'Referenz analysiert. Jetzt eine Gesangsaufnahme aufnehmen oder hochladen.';
     } catch (e) {
       referenceStatus = LoadStatus.error;
       referenceMessage = 'Fehler: ${_messageOf(e)}';
@@ -471,6 +492,7 @@ class SessionState extends ChangeNotifier {
     sungAudioFilename = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
+    audioTruncated = false;
     _resetAlignment();
     notifyListeners();
   }
@@ -483,6 +505,7 @@ class SessionState extends ChangeNotifier {
     sungAudioFilename = null;
     audioStatus = LoadStatus.idle;
     audioMessage = '';
+    audioTruncated = false;
     _resetAlignment();
   }
 
