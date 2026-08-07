@@ -19,7 +19,7 @@ from backend.config import (
     STABILITY_MAD_THRESHOLD_CENTS,
     STABILITY_ONSET_TRIM_SECONDS,
 )
-from backend.scoring.notes import cents_series, hz_to_cents
+from backend.scoring.notes import cents_series
 
 _NOT_APPLICABLE_STABILITY = {"applicable": False, "mad_cents": None, "flag": False}
 _NOT_APPLICABLE_DRIFT = {"applicable": False, "drift_cents": None, "flag": False, "direction": None}

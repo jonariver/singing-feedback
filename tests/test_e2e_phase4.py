@@ -82,6 +82,13 @@ def test_scoring_matches_fixture_expectations():
     assert summary["stability_flagged_count"] == 0
     assert set(summary["problem_tags"]) == {"timingprobleme", "absinkende_phrasenenden"}
 
+    # Note 2 (150ms zu frueh) hat eine DTW-Zeitkorrektur an der Notenschwelle - siehe
+    # den "Nachtrag" in docs/superpowers/specs/2026-08-07-glide-detection-design.md.
+    # Die dritte Gate-Bedingung (timing_classification == "on_time") schliesst genau
+    # diese Note von der Glide-Pruefung aus.
+    assert notes[2]["glide"]["applicable"] is False
+    assert summary["glide_flagged_count"] == 0
+
 
 if __name__ == "__main__":
     test_scoring_matches_fixture_expectations()

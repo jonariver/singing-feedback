@@ -3,7 +3,7 @@ vier Kernpaket-Metriken zu einem strukturierten Ergebnis zusammen."""
 
 from __future__ import annotations
 
-from backend.scoring.glides import compute_glide
+from backend.scoring.glides import NOT_APPLICABLE_GLIDE, compute_glide
 from backend.scoring.notes import attribute_sung_frames, segment_target_notes
 from backend.scoring.pitch import compute_cents_deviation, compute_coverage_fraction, is_missed
 from backend.scoring.stability import compute_phrase_end_drift, compute_stability, is_held_note
@@ -14,10 +14,6 @@ _PROBLEM_TAG_DRIFT = "absinkende_phrasenenden"
 _PROBLEM_TAG_STABILITY = "instabile_lange_toene"
 _PROBLEM_TAG_MISSED = "unsaubere_einsaetze"
 _PROBLEM_TAG_GLIDE = "haeufiges_hineingleiten"
-
-_GLIDE_NOT_APPLICABLE = {
-    "applicable": False, "onset_cents_deviation": None, "flag": False, "direction": None,
-}
 
 
 def score_performance(
@@ -57,7 +53,7 @@ def score_performance(
             and cents
             and cents["classification"] in ("green", "yellow")
             and timing_classification == "on_time"
-            else dict(_GLIDE_NOT_APPLICABLE)
+            else dict(NOT_APPLICABLE_GLIDE)
         )
 
         if missed or (cents and cents["classification"] == "red"):

@@ -17,7 +17,7 @@ from backend.config import (
 )
 from backend.scoring.notes import cents_series
 
-_NOT_APPLICABLE_GLIDE = {
+NOT_APPLICABLE_GLIDE = {
     "applicable": False, "onset_cents_deviation": None, "flag": False, "direction": None,
 }
 
@@ -28,7 +28,7 @@ def compute_glide(note: dict, attributed_frames: list[dict]) -> dict:
     head_values = sorted(c for t, c in series if t < head_end)
     rest_values = sorted(c for t, c in series if t >= head_end)
     if len(head_values) < GLIDE_MIN_HEAD_FRAMES or not rest_values:
-        return dict(_NOT_APPLICABLE_GLIDE)
+        return dict(NOT_APPLICABLE_GLIDE)
 
     head_median = head_values[len(head_values) // 2]
     rest_median = rest_values[len(rest_values) // 2]
