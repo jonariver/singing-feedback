@@ -35,6 +35,20 @@ class MidiApi {
     return curve.map(TargetPoint.fromJson).toList();
   }
 
+  Future<Uint8List> fetchTrackPreview(
+    String sessionId,
+    int trackIndex, {
+    int transpose = 0,
+  }) {
+    return _client.getBytes(
+      '/api/midi/$sessionId/track-preview',
+      query: {
+        'track_index': trackIndex.toString(),
+        'transpose': transpose.toString(),
+      },
+    );
+  }
+
   Future<void> deleteSession(String sessionId) {
     return _client.delete('/api/midi/$sessionId');
   }

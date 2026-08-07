@@ -96,6 +96,14 @@ class _FakeApiClient extends ApiClient {
       },
     };
   }
+
+  int getBytesCallCount = 0;
+
+  @override
+  Future<Uint8List> getBytes(String path, {Map<String, String>? query}) async {
+    getBytesCallCount++;
+    return Uint8List.fromList([1, 2, 3, 4]);
+  }
 }
 
 /// Fake-Implementierung von [AudioPlaybackController] fuer Tests, ganz ohne echten
@@ -660,6 +668,61 @@ void main() {
 
       expect(fake.stopCallCount, 1);
       expect(session.isPlaying, isFalse);
+    });
+  });
+
+  group('SessionState Spur-Vorschau (previewBytesForTrack)', () {
+    test('erster Aufruf holt Bytes ueber die API und cacht sie', () async {
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+      session.midiSessionId = 'session-1';
+
+      final bytes = await session.previewBytesForTrack(0);
+
+      expect(bytes, isNotEmpty);
+      expect(client.getBytesCallCount, 1);
+      expect(session.cachedPreviewBytes(0), same(bytes));
+    });
+
+    test('zweiter Aufruf fuer denselben Track nutzt den Cache statt erneut zu laden', () async {
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+      session.midiSessionId = 'session-1';
+
+      await session.previewBytesForTrack(2);
+      await session.previewBytesForTrack(2);
+
+      expect(client.getBytesCallCount, 1);
+    });
+
+    test('uploadMidi() leert den Preview-Cache', () async {
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+      session.midiSessionId = 'session-1';
+      await session.previewBytesForTrack(0);
+      expect(session.cachedPreviewBytes(0), isNotNull);
+
+      await session.uploadMidi(Uint8List.fromList([9, 9, 9]), 'song.mid');
+
+      expect(session.cachedPreviewBytes(0), isNull);
     });
   });
 }

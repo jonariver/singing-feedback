@@ -161,6 +161,7 @@ class SessionState extends ChangeNotifier {
 
   String? midiSessionId;
   List<TrackCandidate> candidates = [];
+  final Map<int, Uint8List> _trackPreviewCache = {};
   int? selectedTrackIndex;
   int transposeSemitones = 0;
   int referenceTransposeSemitones = 0;
@@ -226,6 +227,7 @@ class SessionState extends ChangeNotifier {
     midiStatus = LoadStatus.loading;
     midiMessage = 'Lade und analysiere MIDI-Datei…';
     candidates = [];
+    _trackPreviewCache.clear();
     _resetAudioSection();
     notifyListeners();
 
@@ -259,6 +261,22 @@ class SessionState extends ChangeNotifier {
     _resetAlignment();
     notifyListeners();
     await _reloadTargetCurve();
+  }
+
+  /// Bereits geladene Vorschau-Bytes fuer einen Track, falls vorhanden - sync,
+  /// fuer den Play/Pause-Icon-Status (siehe isPlayingAudio-Identitaetsvergleich).
+  Uint8List? cachedPreviewBytes(int trackIndex) => _trackPreviewCache[trackIndex];
+
+  /// Holt die Hoerprobe fuer einen Track lazy und cacht sie; wiederholte Aufrufe
+  /// fuer denselben Track loesen keinen erneuten Request aus. Transponierung ist
+  /// bewusst nicht beruecksichtigt (Vorschau ist immer in Originaltonlage, hilft
+  /// bei der Spurwahl vor dem Transponieren).
+  Future<Uint8List> previewBytesForTrack(int trackIndex) async {
+    final cached = _trackPreviewCache[trackIndex];
+    if (cached != null) return cached;
+    final bytes = await midiApi.fetchTrackPreview(midiSessionId!, trackIndex);
+    _trackPreviewCache[trackIndex] = bytes;
+    return bytes;
   }
 
   Future<void> setTranspose(int semitones) async {

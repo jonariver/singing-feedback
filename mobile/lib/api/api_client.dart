@@ -49,6 +49,23 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<Uint8List> getBytes(String path, {Map<String, String>? query}) async {
+    final response = await _http.get(_uri(path, query));
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    }
+    String detail = 'Unbekannter Fehler (${response.statusCode}).';
+    try {
+      final decoded = jsonDecode(response.body.isEmpty ? '{}' : response.body);
+      if (decoded is Map && decoded['detail'] != null) {
+        detail = decoded['detail'].toString();
+      }
+    } catch (_) {
+      // Fehlerantwort war kein JSON - Standardnachricht behalten.
+    }
+    throw ApiException(response.statusCode, detail);
+  }
+
   Future<void> delete(String path) async {
     final response = await _http.delete(_uri(path));
     if (response.statusCode < 200 || response.statusCode >= 300) {
