@@ -90,3 +90,7 @@ TRACK_SCORE_VOCAL_RANGE_MIDI_MAX = 84  # ~C6, grosszuegige obere Grenze
 TRACK_SCORE_DENSITY_MIN_NOTES_PER_SEC = 0.5
 TRACK_SCORE_DENSITY_MAX_NOTES_PER_SEC = 4.0
 TRACK_SCORE_DURATION_RATIO_FULL_SCORE = 0.3  # ab 30% der laengsten Spur volle Punktzahl
+
+# Spurerkennung: Hoerprobe (Sinus-/Obertonsynthesizer, kein Soundfont - siehe PLAN.md).
+TRACK_PREVIEW_MAX_SECONDS = 15.0
+TRACK_PREVIEW_SAMPLE_RATE = 22050

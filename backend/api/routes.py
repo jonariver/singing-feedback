@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 
 from backend.audio_io import AudioDecodeError, load_audio_signal
@@ -20,7 +20,7 @@ from backend.config import (
     PITCH_FMAX_HZ,
     PITCH_FMIN_HZ,
 )
-from backend.midi_analysis import list_track_candidates, load_midi, track_pitch_curve
+from backend.midi_analysis import list_track_candidates, load_midi, synthesize_track_preview, track_pitch_curve
 from backend.pitch_detection import PitchAnalysisError, analyze_pitch, pitch_curve_from_signal
 from backend.feedback import FeedbackUnavailableError, generate_feedback
 from backend.scoring import score_performance
@@ -94,6 +94,22 @@ async def get_track_curve(session_id: str, track_index: int, transpose: int = 0)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"curve": curve}
+
+
+@router.get("/midi/{session_id}/track-preview")
+async def get_track_preview(session_id: str, track_index: int, transpose: int = 0) -> Response:
+    pm = MIDI_SESSIONS.get(session_id)
+    if pm is None:
+        raise HTTPException(
+            status_code=404,
+            detail="MIDI-Session nicht gefunden oder abgelaufen - bitte Datei erneut hochladen.",
+        )
+    try:
+        wav_bytes = synthesize_track_preview(pm, track_index, transpose_semitones=transpose)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return Response(content=wav_bytes, media_type="audio/wav")
 
 
 @router.delete("/midi/{session_id}")
