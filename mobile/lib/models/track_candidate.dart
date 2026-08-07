@@ -13,6 +13,7 @@ class TrackCandidate {
   final bool monophonic;
   final bool nameHintMatch;
   final bool plausible;
+  final double score;
   final List<String> warnings;
 
   const TrackCandidate({
@@ -29,6 +30,7 @@ class TrackCandidate {
     required this.monophonic,
     required this.nameHintMatch,
     required this.plausible,
+    required this.score,
     required this.warnings,
   });
 
@@ -47,6 +49,7 @@ class TrackCandidate {
       monophonic: json['monophonic'] as bool,
       nameHintMatch: json['name_hint_match'] as bool,
       plausible: json['plausible'] as bool,
+      score: (json['score'] as num).toDouble(),
       warnings: (json['warnings'] as List).map((w) => w.toString()).toList(),
     );
   }
