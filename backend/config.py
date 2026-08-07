@@ -95,6 +95,14 @@ MAX_SCORE_REQUEST_BYTES = 20 * 1024 * 1024  # grosszuegig ueber dem realistische
 # unterschiedlich lang sind.
 DTW_BAND_RADIUS = 0.1
 
+# DTW-Ausrichtung: eigene, niedrigere Frame-Rate nur fuer die Onset-Huellkurve, die in
+# die DTW-Distanzberechnung geht (nicht fuer die Pitch-Kurven, die bleiben bei 100Hz).
+# librosa.sequence.dtw legt trotz Sakoe-Chiba-Band immer eine volle dichte Kosten-/
+# Distanzmatrix an (kein Sparse-Speicher) - bei 100Hz wuerde ein 300s-Kurvenpaar eine
+# ~30000x30000-Matrix (~14-20GB RAM) ergeben. Bei 25Hz sind es nur ~7500x7500
+# (~1,3GB) - siehe docs/superpowers/specs/2026-08-07-longer-recordings-design.md.
+DTW_FRAME_RATE_HZ = 25.0
+
 # Spurerkennung (Phase 2): Gewichteter Score je Kandidat (0-100), ersetzt die reine
 # Tuple-Sortierung aus Phase 1. Siehe
 # docs/superpowers/specs/2026-08-07-track-scoring-and-preview-design.md.

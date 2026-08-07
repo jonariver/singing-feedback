@@ -108,6 +108,79 @@ def test_align_curves_recovers_early_onset_offset():
     assert abs(aligned_t - 0.50) < 0.03
 
 
+def test_align_curves_recovers_offset_at_lower_envelope_rate():
+    # Gleiches Szenario wie test_align_curves_recovers_early_onset_offset, aber mit
+    # einer von der 100Hz-Kurven-Rate entkoppelten, groeberen 25Hz-Envelope-Rate -
+    # Kurven bleiben bei 100Hz (n=200 Frames / 2.0s), Envelope-Arrays sind jetzt nur
+    # n=50 lang (ebenfalls 2.0s, aber bei 25Hz).
+    step = 0.01
+    n_curve = 200
+    target_curve = [{"t": round(i * step, 3), "hz": 440.0, "midi_note": 69} for i in range(n_curve)]
+    sung_curve = [
+        {"t": round(i * step, 3), "hz": 440.0, "voiced": True, "confidence": 0.9}
+        for i in range(n_curve)
+    ]
+
+    envelope_rate = 25.0
+    n_env = 50
+    target_envelope = [0.0] * n_env
+    target_envelope[12] = 1.0  # Zielereignis bei t=0.48s
+    sung_envelope = [0.0] * n_env
+    sung_envelope[8] = 1.0  # dasselbe Ereignis 160ms zu frueh, bei t=0.32s
+
+    result = align_curves(
+        target_curve, target_envelope, sung_curve, sung_envelope,
+        envelope_frame_rate_hz=envelope_rate,
+    )
+    # Kurven-Frame 32 (t=0.32s) ist exakt der Sung-Envelope-Anker (Frame 8 bei 25Hz).
+    aligned_t = result["sung_curve"][32]["aligned_t"]
+    assert aligned_t is not None
+    assert aligned_t == pytest.approx(0.48, abs=0.01)
+
+
+def test_align_curves_interpolates_between_envelope_anchors_instead_of_stepping():
+    # Gleicher Aufbau wie oben, plus ein zweites, exakt uebereinstimmendes Ereignis bei
+    # Envelope-Frame 24 (t=0.96s auf beiden Seiten) - das erzeugt einen laengeren
+    # diagonalen (1:1) Pfadabschnitt danach. Kurven-Frames 52-56 (t=0.52-0.56s) liegen
+    # in diesem diagonalen Abschnitt zwischen zwei benachbarten Envelope-Ankern mit
+    # UNTERSCHIEDLICHEN Zielzeiten (0.52s und 0.56s) - bei echter linearer
+    # Interpolation muessen die 5 Kurven-Frames dazwischen 5 verschiedene,
+    # kontinuierlich steigende aligned_t-Werte bekommen, nicht denselben Stufenwert.
+    # (Verifiziert per Hand gegen echtes librosa.sequence.dtw-Verhalten, nicht geraten -
+    # falls eine spaetere librosa-Version den Warping-Pfad fuer dieses exakte Szenario
+    # anders backtrackt, das Kernkriterium [5 verschiedene, aufsteigende Werte im
+    # Fenster] beibehalten und die Frame-Indizes bei Bedarf anpassen.)
+    step = 0.01
+    n_curve = 200
+    target_curve = [{"t": round(i * step, 3), "hz": 440.0, "midi_note": 69} for i in range(n_curve)]
+    sung_curve = [
+        {"t": round(i * step, 3), "hz": 440.0, "voiced": True, "confidence": 0.9}
+        for i in range(n_curve)
+    ]
+
+    envelope_rate = 25.0
+    n_env = 50
+    target_envelope = [0.0] * n_env
+    target_envelope[12] = 1.0
+    target_envelope[24] = 1.0
+    sung_envelope = [0.0] * n_env
+    sung_envelope[8] = 1.0
+    sung_envelope[24] = 1.0
+
+    result = align_curves(
+        target_curve, target_envelope, sung_curve, sung_envelope,
+        envelope_frame_rate_hz=envelope_rate,
+    )
+    aligned = result["sung_curve"]
+    window = [aligned[i]["aligned_t"] for i in range(52, 57)]
+    assert all(v is not None for v in window)
+    assert window == [pytest.approx(0.52 + 0.01 * k, abs=1e-9) for k in range(5)]
+    assert len(set(window)) == 5, (
+        "aligned_t sollte zwischen den DTW-Ankern kontinuierlich interpolieren, "
+        "nicht in Stufen springen"
+    )
+
+
 def test_align_curves_handles_empty_input_without_raising():
     result = align_curves([], [], [], [])
     assert result == {"sung_curve": [], "target_duration": 0.0}
