@@ -56,7 +56,13 @@ class _TrackPreviewButtonState extends State<TrackPreviewButton> {
       children: [
         OutlinedButton.icon(
           onPressed: _isBusy ? null : () => _toggle(session),
-          icon: Icon(isThisPlaying ? Icons.pause : Icons.play_arrow),
+          icon: _isBusy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(isThisPlaying ? Icons.pause : Icons.play_arrow),
           label: Text(isThisPlaying ? 'Pause' : 'Anhören'),
         ),
         if (_errorMessage != null)

@@ -228,6 +228,12 @@ class SessionState extends ChangeNotifier {
     midiMessage = 'Lade und analysiere MIDI-Datei…';
     candidates = [];
     _trackPreviewCache.clear();
+    // Der geteilte Player (siehe Klassenkommentar oben) koennte gerade eine
+    // Track-Vorschau abspielen - der Cache-Clear oben loescht die Bytes, gegen die
+    // isPlayingAudio() vergleicht, also kann kein TrackPreviewButton mehr "Pause"
+    // anzeigen, waehrend die Wiedergabe unsichtbar unbegrenzt weiterliefe. Gleiches
+    // Muster wie setReferenceSource() unten.
+    unawaited(stop());
     _resetAudioSection();
     notifyListeners();
 

@@ -669,6 +669,21 @@ void main() {
       expect(fake.stopCallCount, 1);
       expect(session.isPlaying, isFalse);
     });
+
+    test(
+        'uploadMidi() stoppt eine laufende Wiedergabe des geteilten Players '
+        '(sonst spielt eine Track-Vorschau nach dem Cache-Clear unsichtbar unbegrenzt '
+        'weiter, Regression)', () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      await session.play(Uint8List.fromList([1, 2, 3]));
+      expect(session.isPlaying, isTrue);
+
+      await session.uploadMidi(Uint8List.fromList([9, 9, 9]), 'song.mid');
+
+      expect(fake.stopCallCount, 1);
+      expect(session.isPlaying, isFalse);
+    });
   });
 
   group('SessionState Spur-Vorschau (previewBytesForTrack)', () {
