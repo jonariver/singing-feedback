@@ -8,6 +8,7 @@ from backend.scoring.notes import attribute_sung_frames, segment_target_notes
 from backend.scoring.pitch import compute_cents_deviation, compute_coverage_fraction, is_missed
 from backend.scoring.stability import compute_phrase_end_drift, compute_stability, is_held_note
 from backend.scoring.timing import classify_timing, compute_onset_deviation_ms
+from backend.scoring.vocal_range import compute_vocal_range
 
 _PROBLEM_TAG_TIMING = "timingprobleme"
 _PROBLEM_TAG_DRIFT = "absinkende_phrasenenden"
@@ -23,6 +24,8 @@ def score_performance(
         raise ValueError(
             "sung_curve-Frames ohne 'aligned_t' - bitte zuerst align_curves() aufrufen."
         )
+
+    vocal_range = compute_vocal_range(sung_curve)
 
     target_notes = segment_target_notes(target_curve, frame_rate_hz=frame_rate_hz)
 
@@ -123,5 +126,6 @@ def score_performance(
             "glide_flagged_count": glide_flagged,
             "overall_score": round(overall_score, 1),
             "problem_tags": sorted(problem_tags),
+            "vocal_range": vocal_range,
         },
     }

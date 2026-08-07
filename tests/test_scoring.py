@@ -572,3 +572,25 @@ def test_score_performance_skips_glide_for_timing_flagged_notes():
     }
     assert result["summary"]["glide_flagged_count"] == 0
     assert "haeufiges_hineingleiten" not in result["summary"]["problem_tags"]
+
+
+def test_score_performance_includes_vocal_range_in_summary():
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(100)]
+    sung_curve = [
+        _sung_frame(round(i * 0.01, 3), 220.0 + i * 2.2, aligned_t=round(i * 0.01, 3))
+        for i in range(100)
+    ]
+    result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
+    vocal_range = result["summary"]["vocal_range"]
+    assert vocal_range["applicable"] is True
+    assert vocal_range["min_hz"] < vocal_range["max_hz"]
+
+
+def test_score_performance_vocal_range_not_applicable_for_silent_recording():
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(100)]
+    sung_curve = [
+        _sung_frame(round(i * 0.01, 3), None, voiced=False, aligned_t=round(i * 0.01, 3))
+        for i in range(100)
+    ]
+    result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
+    assert result["summary"]["vocal_range"]["applicable"] is False
