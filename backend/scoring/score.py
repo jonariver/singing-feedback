@@ -3,6 +3,7 @@ vier Kernpaket-Metriken zu einem strukturierten Ergebnis zusammen."""
 
 from __future__ import annotations
 
+from backend.scoring.glides import compute_glide
 from backend.scoring.notes import attribute_sung_frames, segment_target_notes
 from backend.scoring.pitch import compute_cents_deviation, compute_coverage_fraction, is_missed
 from backend.scoring.stability import compute_phrase_end_drift, compute_stability, is_held_note
@@ -12,6 +13,11 @@ _PROBLEM_TAG_TIMING = "timingprobleme"
 _PROBLEM_TAG_DRIFT = "absinkende_phrasenenden"
 _PROBLEM_TAG_STABILITY = "instabile_lange_toene"
 _PROBLEM_TAG_MISSED = "unsaubere_einsaetze"
+_PROBLEM_TAG_GLIDE = "haeufiges_hineingleiten"
+
+_GLIDE_NOT_APPLICABLE = {
+    "applicable": False, "onset_cents_deviation": None, "flag": False, "direction": None,
+}
 
 
 def score_performance(
@@ -27,7 +33,7 @@ def score_performance(
     notes: list[dict] = []
     problem_tags: set[str] = set()
     cents_green = cents_yellow = cents_red = 0
-    missed_count = timing_flagged = stability_flagged = drift_flagged = 0
+    missed_count = timing_flagged = stability_flagged = drift_flagged = glide_flagged = 0
 
     for i, note in enumerate(target_notes):
         is_last = i == len(target_notes) - 1
@@ -45,6 +51,11 @@ def score_performance(
 
         stability = compute_stability(note, attributed)
         drift = compute_phrase_end_drift(note, attributed)
+        glide = (
+            compute_glide(note, attributed)
+            if not missed and cents and cents["classification"] in ("green", "yellow")
+            else dict(_GLIDE_NOT_APPLICABLE)
+        )
 
         if missed or (cents and cents["classification"] == "red"):
             problem_tags.add(_PROBLEM_TAG_MISSED)
@@ -57,6 +68,9 @@ def score_performance(
         if drift["flag"]:
             problem_tags.add(_PROBLEM_TAG_DRIFT)
             drift_flagged += 1
+        if glide["flag"]:
+            problem_tags.add(_PROBLEM_TAG_GLIDE)
+            glide_flagged += 1
 
         if missed:
             missed_count += 1
@@ -84,6 +98,7 @@ def score_performance(
             "held": is_held_note(note),
             "stability": stability,
             "phrase_end_drift": drift,
+            "glide": glide,
             "sung_t": attributed[0]["t"] if attributed else None,
         })
 
@@ -91,7 +106,7 @@ def score_performance(
     penalty = (
         missed_count * 100
         + cents_yellow * 20 + cents_red * 45
-        + timing_flagged * 15 + stability_flagged * 10 + drift_flagged * 10
+        + timing_flagged * 15 + stability_flagged * 10 + drift_flagged * 10 + glide_flagged * 10
     )
     overall_score = max(0.0, 100.0 - (penalty / note_count)) if note_count else 0.0
 
@@ -106,6 +121,7 @@ def score_performance(
             "timing_flagged_count": timing_flagged,
             "stability_flagged_count": stability_flagged,
             "phrase_end_drift_flagged_count": drift_flagged,
+            "glide_flagged_count": glide_flagged,
             "overall_score": round(overall_score, 1),
             "problem_tags": sorted(problem_tags),
         },

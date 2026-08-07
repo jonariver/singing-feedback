@@ -443,3 +443,50 @@ def test_score_performance_sung_t_is_none_when_note_has_no_attributed_frames():
     target_curve = _flat_curve(440.0, 100)
     score = score_performance(target_curve, [])
     assert score["notes"][0]["sung_t"] is None
+
+
+def test_score_performance_flags_glide_and_adds_problem_tag():
+    # Zielnote 1.0s bei 440Hz. Gesang deckt die ganze Note ab: Kopf (0.00-0.15s)
+    # deutlich abseits (-80 Cent), Rest (0.15-0.99s) exakt auf dem Zielton -
+    # ein klarer, hoerbarer Glide, der insgesamt sauber gelandet ist.
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(100)]
+    off_pitch_hz = 440.0 * 2 ** (-80 / 1200)
+    sung_curve = [
+        _sung_frame(round(i * 0.01, 3), off_pitch_hz, aligned_t=round(i * 0.01, 3))
+        for i in range(15)
+    ] + [
+        _sung_frame(round(i * 0.01, 3), 440.0, aligned_t=round(i * 0.01, 3))
+        for i in range(15, 99)
+    ]
+    result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
+    note = result["notes"][0]
+    assert note["missed"] is False
+    assert note["glide"]["applicable"] is True
+    assert note["glide"]["flag"] is True
+    assert note["glide"]["direction"] == "up"
+    assert result["summary"]["glide_flagged_count"] == 1
+    assert "haeufiges_hineingleiten" in result["summary"]["problem_tags"]
+
+
+def test_score_performance_skips_glide_for_missed_notes():
+    # Zielnote 1.0s. Gesang deckt nur die ersten 0.30s ab (Coverage 30% < 50% ->
+    # verfehlt), obwohl die vorhandenen Frames rein rechnerisch wie ein Glide
+    # aussehen wuerden (Kopf abseits, kurzer Rest sauber). Das Gating in score.py
+    # darf compute_glide() bei einer verfehlten Note gar nicht erst aufrufen.
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(100)]
+    off_pitch_hz = 440.0 * 2 ** (-80 / 1200)
+    sung_curve = [
+        _sung_frame(round(i * 0.01, 3), off_pitch_hz, aligned_t=round(i * 0.01, 3))
+        for i in range(15)
+    ] + [
+        _sung_frame(round(i * 0.01, 3), 440.0, aligned_t=round(i * 0.01, 3))
+        for i in range(15, 30)
+    ]
+    result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
+    note = result["notes"][0]
+    assert note["missed"] is True
+    assert note["glide"] == {
+        "applicable": False, "onset_cents_deviation": None, "flag": False, "direction": None,
+    }
+    assert result["summary"]["glide_flagged_count"] == 0
+    assert "haeufiges_hineingleiten" not in result["summary"]["problem_tags"]
