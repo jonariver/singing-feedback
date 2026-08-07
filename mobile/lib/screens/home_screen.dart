@@ -43,15 +43,6 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text('1. Zielmelodie', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            SegmentedButton<ReferenceSource>(
-              segments: const [
-                ButtonSegment(value: ReferenceSource.recording, label: Text('Eigene Aufnahme')),
-                ButtonSegment(value: ReferenceSource.midi, label: Text('MIDI-Datei')),
-              ],
-              selected: {session.referenceSource},
-              onSelectionChanged: (selection) => session.setReferenceSource(selection.first),
-            ),
-            const SizedBox(height: 8),
             if (session.referenceSource == ReferenceSource.midi) ...[
               ElevatedButton.icon(
                 onPressed: () => _pickMidi(context),

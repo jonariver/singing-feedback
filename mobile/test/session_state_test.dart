@@ -217,6 +217,7 @@ SessionState _buildSessionWithPlayback(AudioPlaybackController fake) {
 void main() {
   test('displayedTargetCurve liefert im MIDI-Modus targetCurve unveraendert', () {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.targetCurve = const [TargetPoint(t: 0.0, hz: 220.0, midiNote: 57)];
 
     expect(session.referenceSource, ReferenceSource.midi);
@@ -276,6 +277,7 @@ void main() {
       'targetCurve unangetastet (Regression fuer Desync beim Moduswechsel)',
       () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     // MIDI-Modus: Spur ausgewaehlt, targetCurve wie vom Server fuer +5 Halbtoene
     // zurueckgeliefert simulieren, ohne einen echten MIDI-Upload zu benoetigen.
     session.selectedTrackIndex = 0;
@@ -336,6 +338,7 @@ void main() {
   test('analyzeAudio loest automatisch align() aus und befuellt alignedSungCurve (MIDI-Modus)',
       () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
 
@@ -378,6 +381,7 @@ void main() {
 
   test('setReferenceSource setzt alignedSungCurve/alignStatus zurueck', () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
@@ -391,6 +395,7 @@ void main() {
 
   test('selectTrack setzt alignedSungCurve/alignStatus zurueck (neue Zielmelodie)', () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
@@ -428,6 +433,7 @@ void main() {
   test('align() loest automatisch score() aus und befuellt scoreResult (MIDI-Modus)',
       () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
@@ -453,6 +459,7 @@ void main() {
 
   test('setReferenceSource setzt scoreResult/scoreStatus zurueck', () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
@@ -467,6 +474,7 @@ void main() {
 
   test('selectTrack setzt scoreResult/scoreStatus zurueck (neue Zielmelodie)', () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
@@ -508,6 +516,7 @@ void main() {
   test('setTranspose loest im MIDI-Modus nach einem erfolgreichen Alignment ein '
       'erneutes score() aus', () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
@@ -537,6 +546,7 @@ void main() {
   test('setReferenceSource setzt sungAudioFilename zurueck, wenn sungAudioBytes zurueckgesetzt wird',
       () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
@@ -550,6 +560,7 @@ void main() {
 
   test('requestFeedback() setzt feedbackResult nach erfolgreichem Aufruf', () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
@@ -571,6 +582,7 @@ void main() {
       scoreApi: ScoreApi(client),
       feedbackApi: FeedbackApi(client),
     );
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
@@ -591,6 +603,7 @@ void main() {
       scoreApi: ScoreApi(client),
       feedbackApi: FeedbackApi(client),
     );
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
@@ -612,6 +625,7 @@ void main() {
 
   test('ein erneutes score() setzt ein zuvor geholtes feedbackResult zurueck', () async {
     final session = _buildSession();
+    session.setReferenceSource(ReferenceSource.midi);
     session.midiSessionId = 'sess-1';
     session.selectedTrackIndex = 0;
     await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
@@ -697,6 +711,7 @@ void main() {
         () async {
       final fake = _FakePlaybackController();
       final session = _buildSessionWithPlayback(fake);
+      session.setReferenceSource(ReferenceSource.midi);
       await session.play(Uint8List.fromList([1, 2, 3]));
       expect(session.isPlaying, isTrue);
 

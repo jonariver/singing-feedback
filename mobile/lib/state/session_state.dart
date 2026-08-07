@@ -182,7 +182,7 @@ class SessionState extends ChangeNotifier {
   LoadStatus audioStatus = LoadStatus.idle;
   String audioMessage = '';
 
-  ReferenceSource referenceSource = ReferenceSource.midi;
+  ReferenceSource referenceSource = ReferenceSource.recording;
   List<SungPoint> referenceRawCurve = [];
   LoadStatus referenceStatus = LoadStatus.idle;
   String referenceMessage = '';
