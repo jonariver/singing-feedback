@@ -22,8 +22,9 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
-# Kurze Ausschnitte zuerst (siehe Plan): 20-60s.
-MAX_AUDIO_SECONDS = 90
+# Bis zu 5 Minuten (siehe docs/superpowers/specs/2026-08-07-longer-recordings-design.md;
+# war 90s / "kurze Ausschnitte zuerst").
+MAX_AUDIO_SECONDS = 300
 
 # Rate-Limiting fuer die Upload-Endpunkte (siehe api/rate_limit.py): ohne Nutzerkonten/Auth
 # sind Upload-Groessenlimits + ein simples Zeitfenster-Limit pro Client-IP die einzigen
@@ -80,7 +81,7 @@ VOCAL_RANGE_MAX_TRIM_FRAMES = 10
 # Groessenschutz fuer POST /api/score (kein Audio-Upload -> MAX_AUDIO_SECONDS greift
 # hier nicht automatisch, da ein Client theoretisch ein ueberlanges JSON-Array direkt
 # posten koennte, ohne ueber /api/audio/analyze bzw. /api/sync/align gegangen zu sein).
-MAX_SCORE_CURVE_FRAMES = 20000  # ~200s bei 100Hz, grosszuegig ueber MAX_AUDIO_SECONDS
+MAX_SCORE_CURVE_FRAMES = 35000  # ~350s bei 100Hz, grosszuegig ueber MAX_AUDIO_SECONDS (300s)
 
 MAX_SCORE_REQUEST_BYTES = 20 * 1024 * 1024  # grosszuegig ueber dem realistischen JSON-Volumen bei MAX_SCORE_CURVE_FRAMES
 

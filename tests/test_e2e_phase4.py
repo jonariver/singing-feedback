@@ -29,7 +29,7 @@ def test_scoring_matches_fixture_expectations():
     target_curve = track_pitch_curve(pm, track_index=0, frame_rate_hz=100.0)
     target_envelope = onset_envelope_from_midi_track(pm, track_index=0, frame_rate_hz=100.0)
 
-    y, sr = load_audio_signal(wav_path.read_bytes(), filename_hint="test_vocal.wav")
+    y, sr, _ = load_audio_signal(wav_path.read_bytes(), filename_hint="test_vocal.wav")
     sung_curve = pitch_curve_from_signal(y, sr, frame_rate_hz=100.0)
     sung_envelope = onset_envelope_from_signal(y, sr, frame_rate_hz=100.0)
 

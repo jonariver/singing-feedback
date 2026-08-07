@@ -53,15 +53,23 @@ def analyze_pitch(
     fmin: float = 65.0,
     fmax: float = 1050.0,
     frame_rate_hz: float = 100.0,
-) -> list[dict]:
-    """Liefert die gesungene Tonhoehe als Zeitreihe: [{t, hz|None, voiced, confidence}].
+) -> dict:
+    """Liefert {"curve": [{t, hz|None, voiced, confidence}], "truncated": bool,
+    "original_duration_seconds": float}.
 
     Dekodiert die Audiobytes (temporaer, wird sofort danach geloescht - siehe
     Datenschutz-Leitplanke) und delegiert die eigentliche Tonhoehenberechnung an
-    pitch_curve_from_signal().
+    pitch_curve_from_signal(). "truncated"/"original_duration_seconds" kommen direkt
+    von load_audio_signal() durch (siehe docs/superpowers/specs/
+    2026-08-07-longer-recordings-design.md).
     """
     try:
-        y, sr = load_audio_signal(audio_bytes, filename_hint, max_seconds)
+        y, sr, original_duration_seconds = load_audio_signal(audio_bytes, filename_hint, max_seconds)
     except AudioDecodeError as exc:
         raise PitchAnalysisError(str(exc)) from exc
-    return pitch_curve_from_signal(y, sr, fmin=fmin, fmax=fmax, frame_rate_hz=frame_rate_hz)
+    curve = pitch_curve_from_signal(y, sr, fmin=fmin, fmax=fmax, frame_rate_hz=frame_rate_hz)
+    return {
+        "curve": curve,
+        "truncated": original_duration_seconds > max_seconds,
+        "original_duration_seconds": round(original_duration_seconds, 1),
+    }

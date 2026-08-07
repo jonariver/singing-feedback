@@ -41,7 +41,7 @@ def test_analyze_pitch_detects_known_sine_frequency():
     t = np.arange(int(duration * SR)) / SR
     signal = 0.3 * np.sin(2 * np.pi * freq * t)
 
-    curve = analyze_pitch(_wav_bytes(signal), filename_hint="a4.wav", fmin=65.0, fmax=1050.0)
+    curve = analyze_pitch(_wav_bytes(signal), filename_hint="a4.wav", fmin=65.0, fmax=1050.0)["curve"]
 
     voiced_hz = [p["hz"] for p in curve if p["voiced"]]
     assert len(voiced_hz) > len(curve) * 0.5  # ueberwiegend als stimmhaft erkannt
@@ -53,7 +53,7 @@ def test_analyze_pitch_detects_known_sine_frequency():
 
 def test_analyze_pitch_marks_silence_as_unvoiced():
     silence = np.zeros(int(1.0 * SR))
-    curve = analyze_pitch(_wav_bytes(silence))
+    curve = analyze_pitch(_wav_bytes(silence))["curve"]
     assert all(not p["voiced"] for p in curve)
     assert all(p["hz"] is None for p in curve)
 
@@ -69,8 +69,21 @@ def test_analyze_pitch_truncates_to_max_seconds():
     t = np.arange(int(duration * SR)) / SR
     signal = 0.3 * np.sin(2 * np.pi * freq * t)
 
-    curve = analyze_pitch(_wav_bytes(signal), max_seconds=1.0)
-    assert curve[-1]["t"] <= 1.05
+    result = analyze_pitch(_wav_bytes(signal), max_seconds=1.0)
+    assert result["curve"][-1]["t"] <= 1.05
+    assert result["truncated"] is True
+    assert result["original_duration_seconds"] == pytest.approx(3.0, abs=0.1)
+
+
+def test_analyze_pitch_not_truncated_when_within_max_seconds():
+    duration = 1.0
+    freq = 440.0
+    t = np.arange(int(duration * SR)) / SR
+    signal = 0.3 * np.sin(2 * np.pi * freq * t)
+
+    result = analyze_pitch(_wav_bytes(signal), max_seconds=90.0)
+    assert result["truncated"] is False
+    assert result["original_duration_seconds"] == pytest.approx(1.0, abs=0.05)
 
 
 def test_analyze_pitch_decodes_m4a_via_pyav_fallback():
@@ -84,7 +97,7 @@ def test_analyze_pitch_decodes_m4a_via_pyav_fallback():
 
     curve = analyze_pitch(
         _m4a_bytes(signal), filename_hint="aufnahme.m4a", fmin=65.0, fmax=1050.0
-    )
+    )["curve"]
 
     voiced_hz = [p["hz"] for p in curve if p["voiced"]]
     assert len(voiced_hz) > len(curve) * 0.5

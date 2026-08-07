@@ -38,7 +38,7 @@ from .state import MIDI_SESSIONS
 router = APIRouter(prefix="/api")
 
 MAX_MIDI_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB, MIDI-Dateien sind winzig
-MAX_AUDIO_UPLOAD_BYTES = 40 * 1024 * 1024  # grosszuegig fuer 20-60s unkomprimiertes WAV
+MAX_AUDIO_UPLOAD_BYTES = 80 * 1024 * 1024  # 300s Stereo-44.1kHz-WAV-Upload braucht ~53MB
 
 
 def _reject_oversized_content_length(request: Request, max_bytes: int) -> None:
@@ -156,7 +156,7 @@ def sync_align(
         raise HTTPException(status_code=413, detail="Audiodatei ist unerwartet gross.")
 
     try:
-        y_sung, sr_sung = load_audio_signal(sung_bytes, sung_audio.filename or "sung.wav", MAX_AUDIO_SECONDS)
+        y_sung, sr_sung, _ = load_audio_signal(sung_bytes, sung_audio.filename or "sung.wav", MAX_AUDIO_SECONDS)
     except AudioDecodeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     sung_curve = pitch_curve_from_signal(y_sung, sr_sung, fmin=PITCH_FMIN_HZ, fmax=PITCH_FMAX_HZ)
@@ -167,7 +167,7 @@ def sync_align(
         if len(ref_bytes) > MAX_AUDIO_UPLOAD_BYTES:
             raise HTTPException(status_code=413, detail="Referenz-Audiodatei ist unerwartet gross.")
         try:
-            y_ref, sr_ref = load_audio_signal(
+            y_ref, sr_ref, _ = load_audio_signal(
                 ref_bytes, reference_audio.filename or "reference.wav", MAX_AUDIO_SECONDS,
             )
         except AudioDecodeError as exc:

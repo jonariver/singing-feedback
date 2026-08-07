@@ -53,8 +53,11 @@ def load_audio_signal(
     audio_bytes: bytes,
     filename_hint: str = "upload.wav",
     max_seconds: float = 90.0,
-) -> tuple[np.ndarray, int]:
-    """Dekodiert Audio-Rohbytes zu (Samples, Sample-Rate), auf max_seconds gekappt.
+) -> tuple[np.ndarray, int, float]:
+    """Dekodiert Audio-Rohbytes zu (Samples, Sample-Rate, Original-Dauer-Sekunden),
+    das Sample-Array auf max_seconds gekappt (die dritte Rueckgabe ist immer die
+    UNGEKUERZTE Dauer, auch wenn tatsaechlich gekuerzt wurde - siehe
+    docs/superpowers/specs/2026-08-07-longer-recordings-design.md).
 
     Die Audiodatei wird nur in einer temporaeren Datei zwischengehalten und danach
     sofort geloescht - keine dauerhafte Speicherung (siehe Datenschutz-Leitplanke).
@@ -90,8 +93,9 @@ def load_audio_signal(
     if y.size == 0:
         raise AudioDecodeError("Audiodatei enthaelt keine Samples.")
 
+    original_duration_seconds = y.shape[0] / sr
     max_samples = int(max_seconds * sr)
     if y.shape[0] > max_samples:
         y = y[:max_samples]
 
-    return y, sr
+    return y, sr, original_duration_seconds

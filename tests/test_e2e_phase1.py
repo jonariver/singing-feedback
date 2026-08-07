@@ -39,7 +39,7 @@ def test_full_pipeline_end_to_end():
     assert len(target_curve) > 0
 
     # 3) Aufnahme analysieren (entspricht POST /api/audio/analyze).
-    sung_curve = analyze_pitch(wav_path.read_bytes(), filename_hint="test_vocal.wav")
+    sung_curve = analyze_pitch(wav_path.read_bytes(), filename_hint="test_vocal.wav")["curve"]
     assert len(sung_curve) > 0
 
     # 4) Plausibilitaetscheck der bewusst eingebauten Abweichungen (siehe generate_fixtures.MELODY):

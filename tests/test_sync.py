@@ -250,13 +250,13 @@ def test_align_curves_self_alignment_stays_near_zero_through_a_long_pause():
     Fixture."""
     target_path, sung_path = generate_pause_test_wav(FIXTURES_DIR)
 
-    target_y, target_sr = load_audio_signal(
+    target_y, target_sr, _ = load_audio_signal(
         target_path.read_bytes(), filename_hint="test_pause_target.wav"
     )
     target_curve = pitch_curve_from_signal(target_y, target_sr, frame_rate_hz=100.0)
     target_envelope = onset_envelope_from_signal(target_y, target_sr, frame_rate_hz=100.0)
 
-    sung_y, sung_sr = load_audio_signal(
+    sung_y, sung_sr, _ = load_audio_signal(
         sung_path.read_bytes(), filename_hint="test_pause_sung.wav"
     )
     sung_curve = pitch_curve_from_signal(sung_y, sung_sr, frame_rate_hz=100.0)
