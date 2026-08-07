@@ -52,6 +52,7 @@ def synthesize_track_preview(
     inst = pm.instruments[track_index]
     total_samples = int(max_seconds * sample_rate) + 1
     audio = np.zeros(total_samples)
+    furthest_sample_written = 0
 
     for note in inst.notes:
         if note.start >= max_seconds:
@@ -68,8 +69,18 @@ def synthesize_track_preview(
             segment = segment[: len(audio) - start_sample]
             end_sample = len(audio)
         audio[start_sample:end_sample] += segment
+        furthest_sample_written = max(furthest_sample_written, end_sample)
 
     audio = np.clip(audio, -1.0, 1.0)
+
+    # Nicht die volle max_seconds-Pufferlaenge ausliefern, wenn die Spur (oder der
+    # gerenderte Ausschnitt davon) tatsaechlich kuerzer ist - sonst besteht die
+    # Hoerprobe ueberwiegend aus Stille (siehe Regressionstest unten). Kein Notenrand
+    # ueberhaupt erreicht (leere Spur/alle Noten >= max_seconds): kurze feste Stille
+    # statt des vollen Puffers, damit das WAV trotzdem gueltig/hoerbar-kurz bleibt.
+    if furthest_sample_written == 0:
+        furthest_sample_written = min(len(audio), max(1, int(0.1 * sample_rate)))
+    audio = audio[:furthest_sample_written]
 
     buffer = io.BytesIO()
     sf.write(buffer, audio, sample_rate, format="WAV")

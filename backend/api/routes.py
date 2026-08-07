@@ -97,7 +97,7 @@ async def get_track_curve(session_id: str, track_index: int, transpose: int = 0)
 
 
 @router.get("/midi/{session_id}/track-preview")
-async def get_track_preview(session_id: str, track_index: int, transpose: int = 0) -> Response:
+def get_track_preview(session_id: str, track_index: int, transpose: int = 0) -> Response:
     pm = MIDI_SESSIONS.get(session_id)
     if pm is None:
         raise HTTPException(

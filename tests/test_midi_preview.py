@@ -35,6 +35,18 @@ def test_preview_duration_is_capped_at_max_seconds():
     assert duration <= 2.01  # kleine Toleranz fuer Rundung auf ganze Samples
 
 
+def test_preview_is_not_padded_out_to_max_seconds():
+    # Regression: synthesize_track_preview schrieb frueher immer einen vollen
+    # max_seconds-Puffer (Default 15.0s) unabhaengig von der tatsaechlichen
+    # Notenlaenge - eine 5s-Melodie ergab so eine 15s-Datei, ueberwiegend Stille.
+    # Die Hoerprobe soll nur so lang sein wie der tatsaechlich geschriebene Inhalt.
+    pm = _load_reference()  # test_reference.mid Melodie ist 5.0s lang (siehe MELODY)
+    wav_bytes = synthesize_track_preview(pm, track_index=0)  # Default max_seconds=15.0
+    audio, sr = sf.read(io.BytesIO(wav_bytes))
+    duration = len(audio) / sr
+    assert duration < 6.0
+
+
 def test_preview_of_empty_track_is_silence_not_error():
     pm = pretty_midi.PrettyMIDI()
     inst = pretty_midi.Instrument(program=0, name="Empty")

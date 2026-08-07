@@ -1,9 +1,10 @@
-"""MIDI-Parsing und Basis-Spurauswahl (Phase 1).
+"""MIDI-Parsing und Spurauswahl.
 
-Bewusst noch OHNE die volle Heuristik-Bewertung aus Phase 2 (Notendichte-Score,
-Dauer-Plausibilitaet, Name-Matching-Gewichtung). Phase 1 liefert nur die Rohfakten
-pro Spur (monophon?, Tonumfang, Notenzahl, Dauer, Name/Instrument), damit der Nutzer
-manuell eine plausible Spur waehlen kann - siehe Plan Phase 1 vs. Phase 2.
+Liefert pro Spur die Rohfakten (monophon?, Tonumfang, Notenzahl, Dauer, Name/
+Instrument) UND einen gewichteten Plausibilitaets-Score (Namenstreffer, Monophonie,
+Stimmumfang, Notendichte, Dauer-Plausibilitaet - siehe _compute_score), nach dem
+list_track_candidates() die Kandidaten sortiert. Der Nutzer waehlt trotzdem manuell
+eine Spur; der Score dient nur als Vorauswahl-Hilfe.
 """
 
 from __future__ import annotations
@@ -146,8 +147,9 @@ def _compute_score(
 
 
 def list_track_candidates(pm: pretty_midi.PrettyMIDI) -> list[TrackCandidate]:
-    """Liefert Rohfakten je Instrument-Spur, sortiert danach wie plausibel eine
-    Spur als Gesangsmelodie infrage kommt (Name-Treffer und Monophonie zuerst)."""
+    """Liefert Rohfakten je Instrument-Spur, sortiert nach dem gewichteten Score
+    (Namenstreffer/Monophonie/Stimmumfang/Notendichte/Dauer-Plausibilitaet zusammen,
+    siehe _compute_score), damit die wahrscheinlichste Gesangsspur oben steht."""
     candidates: list[TrackCandidate] = []
 
     for idx, inst in enumerate(pm.instruments):
