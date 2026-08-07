@@ -8,6 +8,7 @@ import '../widgets/playback_button.dart';
 import '../widgets/recording_control.dart';
 import '../widgets/feedback_section.dart';
 import '../widgets/score_summary_view.dart';
+import '../widgets/tolerance_preset_control.dart';
 import '../widgets/share_button.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/track_candidate_card.dart';
@@ -138,6 +139,10 @@ class HomeScreen extends StatelessWidget {
             Text('4. Bewertung', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             StatusBanner(status: session.scoreStatus, message: session.scoreMessage),
+            TolerancePresetControl(
+              value: session.tolerancePreset,
+              onChanged: (preset) => session.setTolerancePreset(preset),
+            ),
             if (session.scoreResult != null) ScoreSummaryView(result: session.scoreResult!),
             const Divider(height: 32),
             Text('5. Feedback', style: Theme.of(context).textTheme.titleMedium),
