@@ -43,16 +43,19 @@ def _matches_missed(note: dict) -> bool:
     return note["missed"] or note["cents_classification"] == "red"
 
 
+def _matches_glide(note: dict) -> bool:
+    return note["glide_flag"]
+
+
 # Bildet dieselbe Bedeutung wie die _PROBLEM_TAG_*-Konstanten in scoring/score.py ab:
 # welches Feld einer geflaggten Note (siehe prompt.py::build_prompt_context) macht sie
-# zu einem Kandidaten fuer die jeweilige Katalog-Kategorie. "haeufiges_hineingleiten"
-# hat bewusst keinen Matcher - Glide-Erkennung ist noch nicht gebaut, problem_tags
-# enthaelt diesen Wert nie, also kommt uebung_id dafuer auch nie vor generate_feedback an.
+# zu einem Kandidaten fuer die jeweilige Katalog-Kategorie.
 _CATEGORY_MATCHERS: dict[str, Callable[[dict], bool]] = {
     "timingprobleme": _matches_timing,
     "absinkende_phrasenenden": _matches_drift,
     "instabile_lange_toene": _matches_stability,
     "unsaubere_einsaetze": _matches_missed,
+    "haeufiges_hineingleiten": _matches_glide,
 }
 
 

@@ -45,6 +45,7 @@ def build_prompt_context(score_result: dict) -> dict:
             or note["timing"]["classification"] != "on_time"
             or note["stability"]["flag"]
             or note["phrase_end_drift"]["flag"]
+            or note["glide"]["flag"]
         )
         if is_flagged:
             flagged_notes.append({
@@ -57,6 +58,8 @@ def build_prompt_context(score_result: dict) -> dict:
                 "stability_flag": note["stability"]["flag"],
                 "phrase_end_drift_flag": note["phrase_end_drift"]["flag"],
                 "phrase_end_drift_direction": note["phrase_end_drift"]["direction"],
+                "glide_flag": note["glide"]["flag"],
+                "glide_direction": note["glide"]["direction"],
                 "sung_t": note["sung_t"],
             })
     return {"summary": summary, "flagged_notes": _sample_evenly(flagged_notes, _MAX_FLAGGED_NOTES_IN_PROMPT)}
@@ -81,6 +84,7 @@ def build_prompt_text(context: dict) -> str:
         f"- Timing-Probleme (zu frueh/spaet): {summary['timing_flagged_count']} Noten",
         f"- Instabile gehaltene Toene: {summary['stability_flagged_count']} Noten",
         f"- Absinkende Phrasenenden: {summary['phrase_end_drift_flagged_count']} Noten",
+        f"- Hineingleiten in den Zielton: {summary['glide_flagged_count']} Noten",
         f"- Gesamtwertung: {summary['overall_score']}/100",
         "",
         "AUFFAELLIGE EINZELNOTEN (nur die mit einem Problem, zur Orientierung):",
@@ -98,6 +102,8 @@ def build_prompt_text(context: dict) -> str:
                 parts.append("instabil")
             if note["phrase_end_drift_flag"]:
                 parts.append(f"Phrasenende sackt ab ({note['phrase_end_drift_direction']})")
+            if note["glide_flag"]:
+                parts.append(f"rutscht rein ({note['glide_direction']})")
             lines.append("- " + " ".join(parts))
     else:
         lines.append("- keine")

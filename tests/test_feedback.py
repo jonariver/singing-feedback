@@ -49,6 +49,8 @@ def _note(
     stability_flag: bool = False,
     drift_flag: bool = False,
     drift_direction: str | None = None,
+    glide_flag: bool = False,
+    glide_direction: str | None = None,
     sung_t: float | None = None,
 ) -> dict:
     return {
@@ -69,6 +71,12 @@ def _note(
             "flag": drift_flag,
             "direction": drift_direction,
         },
+        "glide": {
+            "applicable": True,
+            "onset_cents_deviation": 0.0,
+            "flag": glide_flag,
+            "direction": glide_direction,
+        },
         "sung_t": sung_t,
     }
 
@@ -85,6 +93,7 @@ def _score_result(notes: list[dict]) -> dict:
             "timing_flagged_count": sum(1 for n in notes if n["timing"]["classification"] != "on_time"),
             "stability_flagged_count": sum(1 for n in notes if n["stability"]["flag"]),
             "phrase_end_drift_flagged_count": sum(1 for n in notes if n["phrase_end_drift"]["flag"]),
+            "glide_flagged_count": sum(1 for n in notes if n["glide"]["flag"]),
             "overall_score": 100.0,
             "problem_tags": [],
         },
@@ -99,10 +108,11 @@ def test_build_prompt_context_filters_out_unflagged_notes():
         _note(3, timing_classification="too_late", timing_deviation_ms=250.0),
         _note(4, stability_flag=True),
         _note(5, drift_flag=True, drift_direction="down"),
+        _note(6, glide_flag=True, glide_direction="up"),
     ]
     context = build_prompt_context(_score_result(notes))
     flagged_indices = [n["index"] for n in context["flagged_notes"]]
-    assert flagged_indices == [1, 2, 3, 4, 5]
+    assert flagged_indices == [1, 2, 3, 4, 5, 6]
 
 
 def test_build_prompt_context_includes_summary_unchanged():
@@ -119,6 +129,14 @@ def test_build_prompt_text_mentions_key_summary_numbers():
     assert "Verfehlte Noten: 1" in text
     assert "Note 1:" in text
     assert "verfehlt" in text
+
+
+def test_build_prompt_text_mentions_glide():
+    notes = [_note(0, glide_flag=True, glide_direction="up")]
+    context = build_prompt_context(_score_result(notes))
+    text = build_prompt_text(context)
+    assert "Hineingleiten in den Zielton: 1 Noten" in text
+    assert "rutscht rein (up)" in text
 
 
 def test_build_prompt_text_says_keine_when_no_flagged_notes():
@@ -305,6 +323,21 @@ def test_generate_feedback_gives_different_notes_to_two_points_of_the_same_categ
     result = generate_feedback(score_result, messages_client_factory=lambda: fake)
     assert result["points"][0]["jump_to_t"] == 1.0
     assert result["points"][1]["jump_to_t"] == 2.0
+
+
+def test_generate_feedback_glide_category_resolves_jump_to_t(monkeypatch):
+    # Vor dieser Aenderung hatte "haeufiges_hineingleiten" keinen Eintrag in
+    # _CATEGORY_MATCHERS - _find_jump_to_t haette hier immer None zurueckgegeben,
+    # unabhaengig von sung_t.
+    monkeypatch.setattr("backend.feedback.generate.ANTHROPIC_API_KEY", "dummy-key")
+    notes = [_note(0, glide_flag=True, glide_direction="up", sung_t=3.5)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["haeufiges_hineingleiten"]
+    fake = _FakeMessagesClient(
+        points=[{"problem": "Rutscht in den Ton", "uebung_id": "haeufiges_hineingleiten"}]
+    )
+    result = generate_feedback(score_result, messages_client_factory=lambda: fake)
+    assert result["points"][0]["jump_to_t"] == 3.5
 
 
 def test_generate_feedback_jump_to_t_is_none_when_no_note_matches(monkeypatch):
