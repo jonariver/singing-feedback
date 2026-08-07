@@ -52,7 +52,7 @@ class _RecordingControlState extends State<RecordingControl> {
     _player.dispose();
     if (_holdsWakelock) {
       _holdsWakelock = false;
-      recordingWakelock.release();
+      recordingWakelock.release().catchError((_) {});
     }
     super.dispose();
   }
@@ -71,8 +71,8 @@ class _RecordingControlState extends State<RecordingControl> {
     // iOS AVAudioRecorder) unterstuetzen das nativ, und der PyAV-Fallback in
     // backend/pitch_detection/pyin.py deckt .m4a-Dekodierung serverseitig ab.
     await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
-    await recordingWakelock.acquire();
     _holdsWakelock = true;
+    await recordingWakelock.acquire();
     setState(() => _isRecording = true);
   }
 
