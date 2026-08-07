@@ -101,6 +101,18 @@ also gerade die Art Note, deren ausgerichtete Kopf-Frames am unzuverlässigsten 
 Die Timing-Bedingung schließt genau diesen Fall aus, ohne die Kernlogik in
 `glides.py`/die Schwellenwerte anzufassen.
 
+**Bekannte Restunschärfe (aus dem finalen Whole-Branch-Review, nicht blockierend):** Das
+Kopf-Fenster (`GLIDE_HEAD_SECONDS`, 150ms) überschneidet sich teilweise mit den ersten
+`STABILITY_ONSET_TRIM_SECONDS` (50ms) einer Note, die jede andere Metrik (Cent-Klassifikation,
+Stabilität) bewusst als unzuverlässig verwirft. Die Timing-Bedingung reduziert das
+DTW-Verschmierungsrisiko an Notenübergängen, eliminiert es aber nicht vollständig — eine
+Note kann mit nur 55ms Timing-Abweichung noch als `"on_time"` gelten (Schwelle
+`TIMING_OK_THRESHOLD_MS`=60ms) und trotzdem eine gewisse DTW-Verschmierung im Kopf-Fenster
+tragen. Vor Vertrauen in die Funktion sollte sie an einer echten Aufnahme validiert werden;
+falls sich Fehlalarme zeigen, ist ein Verschieben des Kopf-Fenster-Starts um
+`STABILITY_ONSET_TRIM_SECONDS` der kleinere Hebel gegenüber einer Anhebung von
+`GLIDE_ONSET_THRESHOLD_CENTS`.
+
 - Neues Notenfeld: `"glide": {...}` (Form oben).
 - Neue Summary-Zahl: `"glide_flagged_count"`.
 - `problem_tags` bekommt `"haeufiges_hineingleiten"` (neue Konstante

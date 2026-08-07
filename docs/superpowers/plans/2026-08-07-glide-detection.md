@@ -12,7 +12,7 @@
 
 - New backend constants live in `backend/config.py`, following the existing convention (see `DRIFT_FLAG_THRESHOLD_CENTS` etc.).
 - Median-based comparisons only (no monotonicity checks) — robust against single-frame pYIN noise, consistent with `stability.py`'s existing approach.
-- Glide detection is gated at the orchestrator level in `score.py` (only called for notes that are not `missed` and whose `cents_deviation.classification` is `"green"` or `"yellow"`) — mirrors the existing `timing_classification` gating pattern in the same function.
+- Glide detection is gated at the orchestrator level in `score.py` (only called for notes that are not `missed`, whose `cents_deviation.classification` is `"green"` or `"yellow"`, **and** whose `timing_classification` is `"on_time"` — the third clause was added mid-implementation after a real DTW-alignment boundary artifact was found in the shared e2e fixture; see the "Nachtrag" in `docs/superpowers/specs/2026-08-07-glide-detection-design.md`).
 - No change to `is_missed`/`classify_cents`/timing logic — purely additive.
 - No new E2E fixture — the existing 5-note fixture (`tests/fixtures/generate_fixtures.py`) stays untouched; glide scenarios are tested via directly-constructed frame dicts, matching the existing stability/drift test style in `tests/test_scoring.py`.
 
