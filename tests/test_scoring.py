@@ -424,6 +424,27 @@ def test_compute_vocal_range_uniform_pitch_min_equals_max():
     assert result["max_midi_note"] == 69
 
 
+def test_compute_vocal_range_caps_trim_frames_on_long_recording():
+    # 2000 Frames (20s bei 100Hz) durchgehend bei 440Hz, plus je 15 Frames am
+    # Anfang und Ende bei einer deutlich abweichenden Tonhoehe (330Hz/660Hz) -
+    # mehr als VOCAL_RANGE_MAX_TRIM_FRAMES (10), also darf die Kappung sie NICHT
+    # komplett verschlucken: mindestens ein paar Frames der Randtoene muessen
+    # im Ergebnis sichtbar bleiben.
+    frames = [_sung_frame(round(i * 0.01, 3), 330.0, aligned_t=round(i * 0.01, 3)) for i in range(15)]
+    frames += [
+        _sung_frame(round((15 + i) * 0.01, 3), 440.0, aligned_t=round((15 + i) * 0.01, 3))
+        for i in range(2000)
+    ]
+    frames += [
+        _sung_frame(round((2015 + i) * 0.01, 3), 660.0, aligned_t=round((2015 + i) * 0.01, 3))
+        for i in range(15)
+    ]
+    result = compute_vocal_range(frames)
+    assert result["applicable"] is True
+    assert result["min_hz"] < 440.0
+    assert result["max_hz"] > 440.0
+
+
 from backend.scoring import score_performance
 
 

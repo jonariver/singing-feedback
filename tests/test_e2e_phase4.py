@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from backend.audio_io import load_audio_signal
 from backend.midi_analysis import load_midi, track_pitch_curve
 from backend.pitch_detection import pitch_curve_from_signal
@@ -88,6 +90,16 @@ def test_scoring_matches_fixture_expectations():
     # diese Note von der Glide-Pruefung aus.
     assert notes[2]["glide"]["applicable"] is False
     assert summary["glide_flagged_count"] == 0
+
+    # Stimmumfang der ganzen Aufnahme (Melodie C4-E4-G4-E4-C4, also MIDI 60-67):
+    # tatsaechlich beobachtete Werte aus echter pYIN-Erkennung auf der Fixture
+    # (nicht angenommen, sondern per Skript gegen den echten test_vocal.wav geprueft).
+    vocal_range = summary["vocal_range"]
+    assert vocal_range["applicable"] is True
+    assert vocal_range["min_midi_note"] == 60
+    assert vocal_range["max_midi_note"] == 67
+    assert vocal_range["min_hz"] == pytest.approx(261.506, abs=0.5)
+    assert vocal_range["max_hz"] == pytest.approx(391.817, abs=0.5)
 
 
 if __name__ == "__main__":

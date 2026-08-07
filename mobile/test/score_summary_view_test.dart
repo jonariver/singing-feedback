@@ -136,7 +136,7 @@ void main() {
   });
 
   test('midiNoteName behandelt Oktavgrenzen korrekt', () {
-    expect(midiNoteName(59), 'B3');
+    expect(midiNoteName(59), 'H3');
     expect(midiNoteName(72), 'C5');
   });
 }

@@ -8,6 +8,7 @@ from __future__ import annotations
 from backend.config import (
     VOCAL_RANGE_HIGH_PERCENTILE,
     VOCAL_RANGE_LOW_PERCENTILE,
+    VOCAL_RANGE_MAX_TRIM_FRAMES,
     VOCAL_RANGE_MIN_VOICED_FRAMES,
 )
 from backend.scoring.notes import hz_to_midi_note
@@ -26,10 +27,10 @@ def compute_vocal_range(sung_curve: list[dict]) -> dict:
         return dict(NOT_APPLICABLE_VOCAL_RANGE)
 
     n = len(voiced_hz)
-    low_index = round((VOCAL_RANGE_LOW_PERCENTILE / 100) * (n - 1))
-    high_index = round((VOCAL_RANGE_HIGH_PERCENTILE / 100) * (n - 1))
-    min_hz = voiced_hz[low_index]
-    max_hz = voiced_hz[high_index]
+    low_trim = min(round((VOCAL_RANGE_LOW_PERCENTILE / 100) * n), VOCAL_RANGE_MAX_TRIM_FRAMES)
+    high_trim = min(round(((100 - VOCAL_RANGE_HIGH_PERCENTILE) / 100) * n), VOCAL_RANGE_MAX_TRIM_FRAMES)
+    min_hz = voiced_hz[low_trim]
+    max_hz = voiced_hz[n - 1 - high_trim]
     return {
         "applicable": True,
         "min_hz": round(min_hz, 3),

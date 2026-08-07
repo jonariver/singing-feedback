@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/score_result.dart';
 
 const _midiNoteNames = [
-  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
+  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H',
 ];
 
 String midiNoteName(int midiNote) {
@@ -81,6 +81,7 @@ class ScoreSummaryView extends StatelessWidget {
               'Stimmumfang: '
               '${midiNoteName(result.summary.vocalRange.minMidiNote!)}'
               '–${midiNoteName(result.summary.vocalRange.maxMidiNote!)}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
       ],

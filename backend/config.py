@@ -75,6 +75,7 @@ GLIDE_ONSET_THRESHOLD_CENTS = 60.0
 VOCAL_RANGE_LOW_PERCENTILE = 5.0
 VOCAL_RANGE_HIGH_PERCENTILE = 95.0
 VOCAL_RANGE_MIN_VOICED_FRAMES = 10
+VOCAL_RANGE_MAX_TRIM_FRAMES = 10
 
 # Groessenschutz fuer POST /api/score (kein Audio-Upload -> MAX_AUDIO_SECONDS greift
 # hier nicht automatisch, da ein Client theoretisch ein ueberlanges JSON-Array direkt
