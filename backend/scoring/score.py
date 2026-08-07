@@ -3,6 +3,7 @@ vier Kernpaket-Metriken zu einem strukturierten Ergebnis zusammen."""
 
 from __future__ import annotations
 
+from backend.config import CENTS_TOLERANCE_PRESETS, DEFAULT_CENTS_TOLERANCE_PRESET
 from backend.scoring.glides import NOT_APPLICABLE_GLIDE, compute_glide
 from backend.scoring.notes import attribute_sung_frames, segment_target_notes
 from backend.scoring.pitch import compute_cents_deviation, compute_coverage_fraction, is_missed
@@ -19,11 +20,16 @@ _PROBLEM_TAG_GLIDE = "haeufiges_hineingleiten"
 
 def score_performance(
     target_curve: list[dict], sung_curve: list[dict], frame_rate_hz: float = 100.0,
+    tolerance_preset: str = DEFAULT_CENTS_TOLERANCE_PRESET,
 ) -> dict:
     if sung_curve and any("aligned_t" not in frame for frame in sung_curve):
         raise ValueError(
             "sung_curve-Frames ohne 'aligned_t' - bitte zuerst align_curves() aufrufen."
         )
+
+    cents_thresholds = CENTS_TOLERANCE_PRESETS[tolerance_preset]
+    green_threshold = cents_thresholds["green"]
+    yellow_threshold = cents_thresholds["yellow"]
 
     vocal_range = compute_vocal_range(sung_curve)
 
@@ -39,7 +45,7 @@ def score_performance(
         attributed = attribute_sung_frames(sung_curve, note, is_last)
 
         coverage = compute_coverage_fraction(note, attributed, frame_rate_hz)
-        cents = compute_cents_deviation(note, attributed)
+        cents = compute_cents_deviation(note, attributed, green_threshold, yellow_threshold)
         cents_value = cents["value"] if cents else None
         missed = is_missed(coverage, cents_value)
 
@@ -51,7 +57,7 @@ def score_performance(
         stability = compute_stability(note, attributed)
         drift = compute_phrase_end_drift(note, attributed)
         glide = (
-            compute_glide(note, attributed)
+            compute_glide(note, attributed, green_threshold)
             if not missed
             and cents
             and cents["classification"] in ("green", "yellow")

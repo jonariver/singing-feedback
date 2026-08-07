@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from backend.config import (
-    CENTS_GREEN_THRESHOLD,
-    CENTS_YELLOW_THRESHOLD,
     MISSED_NOTE_CENTS_THRESHOLD,
     MISSED_NOTE_MIN_COVERAGE_FRACTION,
     STABILITY_ONSET_TRIM_SECONDS,
@@ -12,11 +10,11 @@ from backend.config import (
 from backend.scoring.notes import hz_to_cents
 
 
-def classify_cents(value: float) -> str:
+def classify_cents(value: float, green_threshold: float, yellow_threshold: float) -> str:
     magnitude = abs(value)
-    if magnitude <= CENTS_GREEN_THRESHOLD:
+    if magnitude <= green_threshold:
         return "green"
-    if magnitude <= CENTS_YELLOW_THRESHOLD:
+    if magnitude <= yellow_threshold:
         return "yellow"
     return "red"
 
@@ -34,14 +32,17 @@ def _voiced_deviations(note: dict, attributed_frames: list[dict]) -> list[float]
     return deviations
 
 
-def compute_cents_deviation(note: dict, attributed_frames: list[dict]) -> dict | None:
+def compute_cents_deviation(
+    note: dict, attributed_frames: list[dict], green_threshold: float, yellow_threshold: float,
+) -> dict | None:
     """{'value': float, 'classification': str} oder None, wenn keine stimmhaften
     Frames zugeordnet werden konnten (dann greift stattdessen is_missed())."""
     deviations = sorted(_voiced_deviations(note, attributed_frames))
     if not deviations:
         return None
     median_value = deviations[len(deviations) // 2]
-    return {"value": round(median_value, 1), "classification": classify_cents(median_value)}
+    classification = classify_cents(median_value, green_threshold, yellow_threshold)
+    return {"value": round(median_value, 1), "classification": classification}
 
 
 def compute_coverage_fraction(note: dict, attributed_frames: list[dict], frame_rate_hz: float = 100.0) -> float:

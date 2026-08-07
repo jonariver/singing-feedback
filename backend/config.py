@@ -47,9 +47,16 @@ NOTE_SEGMENT_MIN_DURATION_SECONDS = 0.12
 # Bewertungs-Engine: Zurechnung gesungener Frames zu Noten.
 LAST_NOTE_TAIL_TOLERANCE_SECONDS = 0.3
 
-# Bewertungs-Engine: Cent-Abweichung & verfehlte Zielnoten.
-CENTS_GREEN_THRESHOLD = 15.0
-CENTS_YELLOW_THRESHOLD = 50.0
+# Bewertungs-Engine: Cent-Abweichung & verfehlte Zielnoten. Toleranz-Presets
+# fuer die gruen/gelb/rot-Klassifikation (siehe
+# docs/superpowers/specs/2026-08-07-tolerance-preset-design.md); "normal" ist
+# server- und app-seitiger Default.
+CENTS_TOLERANCE_PRESETS = {
+    "strict": {"green": 15.0, "yellow": 50.0},
+    "normal": {"green": 25.0, "yellow": 75.0},
+    "loose": {"green": 35.0, "yellow": 100.0},
+}
+DEFAULT_CENTS_TOLERANCE_PRESET = "normal"
 MISSED_NOTE_MIN_COVERAGE_FRACTION = 0.5
 MISSED_NOTE_CENTS_THRESHOLD = 300.0
 STABILITY_ONSET_TRIM_SECONDS = 0.05

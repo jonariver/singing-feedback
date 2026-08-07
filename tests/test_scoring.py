@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.config import MISSED_NOTE_MIN_COVERAGE_FRACTION
+from backend.config import MISSED_NOTE_MIN_COVERAGE_FRACTION, CENTS_TOLERANCE_PRESETS
 from backend.scoring.notes import attribute_sung_frames, hz_to_cents, hz_to_midi_note, segment_target_notes
 from backend.scoring.pitch import (
     classify_cents,
@@ -117,12 +117,21 @@ def _sung_frame(t: float, hz: float | None, voiced: bool = True, aligned_t: floa
 
 
 def test_classify_cents_boundaries():
-    assert classify_cents(14.9) == "green"
-    assert classify_cents(15.0) == "green"
-    assert classify_cents(15.1) == "yellow"
-    assert classify_cents(-49.9) == "yellow"
-    assert classify_cents(50.0) == "yellow"
-    assert classify_cents(50.1) == "red"
+    assert classify_cents(14.9, green_threshold=15.0, yellow_threshold=50.0) == "green"
+    assert classify_cents(15.0, green_threshold=15.0, yellow_threshold=50.0) == "green"
+    assert classify_cents(15.1, green_threshold=15.0, yellow_threshold=50.0) == "yellow"
+    assert classify_cents(-49.9, green_threshold=15.0, yellow_threshold=50.0) == "yellow"
+    assert classify_cents(50.0, green_threshold=15.0, yellow_threshold=50.0) == "yellow"
+    assert classify_cents(50.1, green_threshold=15.0, yellow_threshold=50.0) == "red"
+
+
+def test_classify_cents_respects_different_presets():
+    # Bei 30 Cent klassifiziert "strict" (15/50) gelb, "loose" (35/100) gruen -
+    # derselbe Messwert, unterschiedliche Presets, unterschiedliches Ergebnis.
+    strict = CENTS_TOLERANCE_PRESETS["strict"]
+    loose = CENTS_TOLERANCE_PRESETS["loose"]
+    assert classify_cents(30.0, strict["green"], strict["yellow"]) == "yellow"
+    assert classify_cents(30.0, loose["green"], loose["yellow"]) == "green"
 
 
 def test_compute_cents_deviation_uses_median_not_mean():
@@ -133,7 +142,8 @@ def test_compute_cents_deviation_uses_median_not_mean():
         _sung_frame(round((90 + i) * 0.01, 3), 440.0 * 2 ** (-100 * (i / 30) / 1200))
         for i in range(30)
     ]
-    result = compute_cents_deviation(note, frames)
+    normal = CENTS_TOLERANCE_PRESETS["normal"]
+    result = compute_cents_deviation(note, frames, normal["green"], normal["yellow"])
     assert result is not None
     assert abs(result["value"]) < 5
 
@@ -141,7 +151,8 @@ def test_compute_cents_deviation_uses_median_not_mean():
 def test_compute_cents_deviation_none_without_voiced_frames():
     note = {"start_t": 0.0, "end_t": 1.0, "hz": 440.0}
     frames = [_sung_frame(0.5, None, voiced=False)]
-    assert compute_cents_deviation(note, frames) is None
+    normal = CENTS_TOLERANCE_PRESETS["normal"]
+    assert compute_cents_deviation(note, frames, normal["green"], normal["yellow"]) is None
 
 
 def test_compute_coverage_fraction_full_coverage():
@@ -319,7 +330,7 @@ def test_compute_glide_flags_genuine_glide_and_reports_direction():
         _sung_frame(round(1.15 + i * 0.01, 3), 440.0, aligned_t=round(1.15 + i * 0.01, 3))
         for i in range(85)
     ]
-    result = compute_glide(note, head_frames + rest_frames)
+    result = compute_glide(note, head_frames + rest_frames, CENTS_TOLERANCE_PRESETS["normal"]["green"])
     assert result["applicable"] is True
     assert result["flag"] is True
     assert result["direction"] == "up"
@@ -333,7 +344,7 @@ def test_compute_glide_does_not_flag_clean_onset():
         _sung_frame(round(1.0 + i * 0.01, 3), 440.0, aligned_t=round(1.0 + i * 0.01, 3))
         for i in range(100)
     ]
-    result = compute_glide(note, frames)
+    result = compute_glide(note, frames, CENTS_TOLERANCE_PRESETS["normal"]["green"])
     assert result["applicable"] is True
     assert result["flag"] is False
     assert result["direction"] is None
@@ -352,7 +363,7 @@ def test_compute_glide_not_applicable_with_too_few_head_frames():
         _sung_frame(round(1.15 + i * 0.01, 3), 440.0, aligned_t=round(1.15 + i * 0.01, 3))
         for i in range(85)
     ]
-    result = compute_glide(note, head_frames + rest_frames)
+    result = compute_glide(note, head_frames + rest_frames, CENTS_TOLERANCE_PRESETS["normal"]["green"])
     assert result["applicable"] is False
     assert result["onset_cents_deviation"] is None
     assert result["flag"] is False
@@ -367,7 +378,7 @@ def test_compute_glide_not_applicable_when_note_shorter_than_head_window():
         _sung_frame(round(i * 0.01, 3), off_pitch_hz, aligned_t=round(i * 0.01, 3))
         for i in range(8)
     ]
-    result = compute_glide(note, frames)
+    result = compute_glide(note, frames, CENTS_TOLERANCE_PRESETS["normal"]["green"])
     assert result["applicable"] is False
 
 
@@ -605,6 +616,35 @@ def test_score_performance_includes_vocal_range_in_summary():
     vocal_range = result["summary"]["vocal_range"]
     assert vocal_range["applicable"] is True
     assert vocal_range["min_hz"] < vocal_range["max_hz"]
+
+
+def test_score_performance_tolerance_preset_changes_classification():
+    # Dieselbe Eingabe (konstant +30 Cent zu hoch), zwei verschiedene Presets:
+    # "strict" (15/50) klassifiziert gelb, "loose" (35/100) klassifiziert gruen.
+    target_curve = _flat_curve(440.0, 100)
+    off_pitch_hz = 440.0 * 2 ** (30 / 1200)
+    sung_curve = [
+        _sung_frame(round(i * 0.01, 3), off_pitch_hz, aligned_t=round(i * 0.01, 3))
+        for i in range(100)
+    ]
+
+    strict_result = score_performance(target_curve, sung_curve, tolerance_preset="strict")
+    loose_result = score_performance(target_curve, sung_curve, tolerance_preset="loose")
+
+    assert strict_result["notes"][0]["cents_deviation"]["classification"] == "yellow"
+    assert strict_result["summary"]["cents_yellow"] == 1
+    assert loose_result["notes"][0]["cents_deviation"]["classification"] == "green"
+    assert loose_result["summary"]["cents_green"] == 1
+
+
+def test_score_performance_unknown_tolerance_preset_raises_key_error():
+    target_curve = _flat_curve(440.0, 100)
+    sung_curve = [
+        _sung_frame(round(i * 0.01, 3), 440.0, aligned_t=round(i * 0.01, 3))
+        for i in range(100)
+    ]
+    with pytest.raises(KeyError):
+        score_performance(target_curve, sung_curve, tolerance_preset="unbekannt")
 
 
 def test_score_performance_vocal_range_not_applicable_for_silent_recording():

@@ -10,7 +10,6 @@ Ausreisser) wie stability.py.
 from __future__ import annotations
 
 from backend.config import (
-    CENTS_GREEN_THRESHOLD,
     GLIDE_HEAD_SECONDS,
     GLIDE_MIN_HEAD_FRAMES,
     GLIDE_ONSET_THRESHOLD_CENTS,
@@ -22,7 +21,7 @@ NOT_APPLICABLE_GLIDE = {
 }
 
 
-def compute_glide(note: dict, attributed_frames: list[dict]) -> dict:
+def compute_glide(note: dict, attributed_frames: list[dict], green_threshold: float) -> dict:
     head_end = min(note["start_t"] + GLIDE_HEAD_SECONDS, note["end_t"])
     series = cents_series(note, attributed_frames)
     head_values = sorted(c for t, c in series if t < head_end)
@@ -32,7 +31,7 @@ def compute_glide(note: dict, attributed_frames: list[dict]) -> dict:
 
     head_median = head_values[len(head_values) // 2]
     rest_median = rest_values[len(rest_values) // 2]
-    flag = abs(head_median) > GLIDE_ONSET_THRESHOLD_CENTS and abs(rest_median) <= CENTS_GREEN_THRESHOLD
+    flag = abs(head_median) > GLIDE_ONSET_THRESHOLD_CENTS and abs(rest_median) <= green_threshold
     direction = ("up" if head_median < 0 else "down") if flag else None
     return {
         "applicable": True,

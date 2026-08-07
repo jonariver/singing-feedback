@@ -215,6 +215,7 @@ def sync_align(
 class ScoreRequest(BaseModel):
     target_curve: list[dict]
     sung_curve: list[dict]  # muss die AUSGERICHTETE Kurve sein (aligned_t vorhanden)
+    tolerance_preset: str = "normal"
 
 
 @router.post("/score", dependencies=[Depends(enforce_upload_rate_limit)])
@@ -223,7 +224,9 @@ def score(request: Request, body: ScoreRequest) -> dict:
     if len(body.target_curve) > MAX_SCORE_CURVE_FRAMES or len(body.sung_curve) > MAX_SCORE_CURVE_FRAMES:
         raise HTTPException(status_code=413, detail="Kurve ist unerwartet lang.")
     try:
-        result = score_performance(body.target_curve, body.sung_curve)
+        result = score_performance(
+            body.target_curve, body.sung_curve, tolerance_preset=body.tolerance_preset,
+        )
     except (ValueError, KeyError, TypeError) as exc:
         raise HTTPException(
             status_code=400,
