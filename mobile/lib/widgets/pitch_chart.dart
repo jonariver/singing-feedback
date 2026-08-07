@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/sung_point.dart';
 import '../models/target_point.dart';
 
-const _noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const _noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'B', 'H'];
 const _targetColor = Color(0xFF00C2CB);
 const _sungColor = Color(0xFFEA580C);
 
