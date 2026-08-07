@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:singing_feedback_mobile/util/recording_wakelock.dart';
 
 /// Nimmt per Mikrofon auf oder laesst alternativ eine vorhandene Audiodatei waehlen
 /// (Datei-Fallback = Paritaet mit dem heutigen <input type="file"> in app.js, das
@@ -31,6 +32,7 @@ class _RecordingControlState extends State<RecordingControl> {
   bool _isRecording = false;
   bool _isPlaying = false;
   bool _isBusy = false;
+  bool _holdsWakelock = false;
   Uint8List? _pendingAudio;
   String? _pendingFilename;
   String? _errorMessage;
@@ -48,6 +50,10 @@ class _RecordingControlState extends State<RecordingControl> {
     _playerCompleteSubscription.cancel();
     _recorder.dispose();
     _player.dispose();
+    if (_holdsWakelock) {
+      _holdsWakelock = false;
+      recordingWakelock.release();
+    }
     super.dispose();
   }
 
@@ -65,11 +71,17 @@ class _RecordingControlState extends State<RecordingControl> {
     // iOS AVAudioRecorder) unterstuetzen das nativ, und der PyAV-Fallback in
     // backend/pitch_detection/pyin.py deckt .m4a-Dekodierung serverseitig ab.
     await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+    await recordingWakelock.acquire();
+    _holdsWakelock = true;
     setState(() => _isRecording = true);
   }
 
   Future<void> _stopRecording() async {
     final path = await _recorder.stop();
+    if (_holdsWakelock) {
+      _holdsWakelock = false;
+      await recordingWakelock.release();
+    }
     setState(() => _isRecording = false);
     if (path == null) return;
     final bytes = await File(path).readAsBytes();
