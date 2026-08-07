@@ -25,6 +25,10 @@ def hz_to_cents(hz: float, ref_hz: float = 440.0) -> float:
     return 1200.0 * math.log2(hz / ref_hz)
 
 
+def hz_to_midi_note(hz: float) -> int:
+    return round(69 + 12 * math.log2(hz / 440.0))
+
+
 def segment_target_notes(
     target_curve: list[dict],
     frame_rate_hz: float = 100.0,
@@ -90,7 +94,7 @@ def segment_target_notes(
         if midi_notes:
             midi_note = max(set(midi_notes), key=midi_notes.count)
         else:
-            midi_note = round(69 + 12 * math.log2(median_hz / 440.0))
+            midi_note = hz_to_midi_note(median_hz)
         notes.append({
             "index": len(notes),
             "start_t": round(start_t, 3),

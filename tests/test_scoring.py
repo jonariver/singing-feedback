@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.config import MISSED_NOTE_MIN_COVERAGE_FRACTION
-from backend.scoring.notes import attribute_sung_frames, hz_to_cents, segment_target_notes
+from backend.scoring.notes import attribute_sung_frames, hz_to_cents, hz_to_midi_note, segment_target_notes
 from backend.scoring.pitch import (
     classify_cents,
     compute_cents_deviation,
@@ -369,6 +369,59 @@ def test_compute_glide_not_applicable_when_note_shorter_than_head_window():
     ]
     result = compute_glide(note, frames)
     assert result["applicable"] is False
+
+
+def test_hz_to_midi_note_reference_a4():
+    assert hz_to_midi_note(440.0) == 69
+
+
+def test_hz_to_midi_note_middle_c():
+    assert hz_to_midi_note(261.626) == 60
+
+
+from backend.scoring.vocal_range import compute_vocal_range
+
+
+def test_compute_vocal_range_trims_outliers_via_percentile():
+    # 100 Frames gleichmaessig zwischen ~220Hz und ~438Hz verteilt, plus 2 extreme
+    # Ausreisser (55Hz und 1760Hz, je 2 Oktaven ausserhalb) - die Perzentil-Trimmung
+    # (5./95.) darf sie nicht in min_hz/max_hz einfliessen lassen.
+    frames = [_sung_frame(round(i * 0.01, 3), 220.0 + i * 2.2, aligned_t=round(i * 0.01, 3)) for i in range(100)]
+    frames.append(_sung_frame(1.0, 55.0, aligned_t=1.0))
+    frames.append(_sung_frame(1.01, 1760.0, aligned_t=1.01))
+    result = compute_vocal_range(frames)
+    assert result["applicable"] is True
+    assert 200.0 < result["min_hz"] < 240.0
+    assert 420.0 < result["max_hz"] < 445.0
+
+
+def test_compute_vocal_range_not_applicable_with_too_few_frames():
+    frames = [_sung_frame(round(i * 0.01, 3), 440.0, aligned_t=round(i * 0.01, 3)) for i in range(5)]
+    result = compute_vocal_range(frames)
+    assert result["applicable"] is False
+    assert result["min_hz"] is None
+    assert result["max_hz"] is None
+    assert result["min_midi_note"] is None
+    assert result["max_midi_note"] is None
+
+
+def test_compute_vocal_range_not_applicable_when_fully_unvoiced():
+    frames = [
+        _sung_frame(round(i * 0.01, 3), None, voiced=False, aligned_t=round(i * 0.01, 3))
+        for i in range(50)
+    ]
+    result = compute_vocal_range(frames)
+    assert result["applicable"] is False
+
+
+def test_compute_vocal_range_uniform_pitch_min_equals_max():
+    frames = [_sung_frame(round(i * 0.01, 3), 440.0, aligned_t=round(i * 0.01, 3)) for i in range(50)]
+    result = compute_vocal_range(frames)
+    assert result["applicable"] is True
+    assert result["min_hz"] == pytest.approx(440.0)
+    assert result["max_hz"] == pytest.approx(440.0)
+    assert result["min_midi_note"] == 69
+    assert result["max_midi_note"] == 69
 
 
 from backend.scoring import score_performance

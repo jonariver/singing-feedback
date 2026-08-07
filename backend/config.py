@@ -70,6 +70,12 @@ GLIDE_HEAD_SECONDS = 0.15
 GLIDE_MIN_HEAD_FRAMES = 3
 GLIDE_ONSET_THRESHOLD_CENTS = 60.0
 
+# Bewertungs-Engine: Stimmumfang der Aufnahme (Phase 4-Rest, Teil 2) - siehe
+# docs/superpowers/specs/2026-08-07-vocal-range-design.md.
+VOCAL_RANGE_LOW_PERCENTILE = 5.0
+VOCAL_RANGE_HIGH_PERCENTILE = 95.0
+VOCAL_RANGE_MIN_VOICED_FRAMES = 10
+
 # Groessenschutz fuer POST /api/score (kein Audio-Upload -> MAX_AUDIO_SECONDS greift
 # hier nicht automatisch, da ein Client theoretisch ein ueberlanges JSON-Array direkt
 # posten koennte, ohne ueber /api/audio/analyze bzw. /api/sync/align gegangen zu sein).
