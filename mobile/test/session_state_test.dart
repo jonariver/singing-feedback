@@ -135,6 +135,7 @@ class _TruncatingFakeApiClient extends ApiClient {
     return {
       'curve': [
         {'t': 0.0, 'hz': 440.0, 'voiced': true, 'confidence': 0.9},
+        {'t': 90.0, 'hz': 440.0, 'voiced': true, 'confidence': 0.9},
       ],
       'truncated': true,
       'original_duration_seconds': 116.0,
@@ -799,7 +800,11 @@ void main() {
 
       expect(session.audioTruncated, isTrue);
       expect(session.audioStatus, LoadStatus.warning);
+      // '1:56' ist die urspruengliche (Vor-Kuerzungs-)Dauer, '1:30' die Dauer, auf
+      // die tatsaechlich gekuerzt wurde (aus dem letzten Kurvenpunkt abgeleitet -
+      // siehe result.curve.last.t in analyzeAudio()).
       expect(session.audioMessage, contains('1:56'));
+      expect(session.audioMessage, contains('1:30'));
     });
 
     test('analyzeAudio() setzt audioTruncated NICHT, wenn nicht gekuerzt wurde', () async {

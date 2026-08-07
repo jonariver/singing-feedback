@@ -340,7 +340,8 @@ class SessionState extends ChangeNotifier {
       audioStatus = result.truncated ? LoadStatus.warning : LoadStatus.ok;
       audioMessage = result.truncated
           ? 'Analyse fertig. Achtung: Aufnahme war '
-              '${formatDurationMinSec(result.originalDurationSeconds)} lang und wurde gekürzt.'
+              '${formatDurationMinSec(result.originalDurationSeconds)} lang und wurde auf '
+              '${formatDurationMinSec(result.curve.isNotEmpty ? result.curve.last.t : 0)} gekürzt.'
           : 'Analyse fertig.';
       notifyListeners();
       await align();
@@ -467,7 +468,8 @@ class SessionState extends ChangeNotifier {
       referenceStatus = result.truncated ? LoadStatus.warning : LoadStatus.ok;
       referenceMessage = result.truncated
           ? 'Referenz analysiert. Achtung: Aufnahme war '
-              '${formatDurationMinSec(result.originalDurationSeconds)} lang und wurde gekürzt. '
+              '${formatDurationMinSec(result.originalDurationSeconds)} lang und wurde auf '
+              '${formatDurationMinSec(result.curve.isNotEmpty ? result.curve.last.t : 0)} gekürzt. '
               'Jetzt eine Gesangsaufnahme aufnehmen oder hochladen.'
           : 'Referenz analysiert. Jetzt eine Gesangsaufnahme aufnehmen oder hochladen.';
     } catch (e) {
