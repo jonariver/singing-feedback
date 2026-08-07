@@ -112,9 +112,15 @@ ratenlimitierte) Session; ein Angreifer kann daraus keine unbounded Last erzeuge
   Dauer-Anteil-Score, Notendichte außerhalb des Fensters senkt Score in beide Richtungen).
 - `synthesize_track_preview`: liefert gültige, dekodierbare WAV-Bytes; Dauer ist auf
   `max_seconds` gedeckelt auch bei längeren Spuren; leere Spur liefert Stille statt Fehler.
-- Endpoint-Test für `GET /midi/{session_id}/track-preview` (analog zum bestehenden
-  `track-curve`-Test): gültiger Request liefert `audio/wav`, ungültiger `track_index` liefert
-  Fehler.
+- Kein dedizierter HTTP-Level-Test für `GET /midi/{session_id}/track-preview` (Korrektur
+  gegenüber der ursprünglichen Formulierung dieser Sektion, die fälschlich einen analogen
+  bestehenden `track-curve`-Endpoint-Test unterstellte — den gibt es nicht: dieses Repo hat
+  aktuell keinen einzigen `TestClient`-basierten Test, alle Endpunkte werden nur indirekt über
+  ihre zugrunde liegenden Funktionen getestet, siehe z.B. `tests/test_e2e_phase1.py`). Bewusst
+  konsistent mit diesem bestehenden Muster: `synthesize_track_preview()` selbst ist über
+  `tests/test_midi_preview.py` vollständig abgedeckt (gültige WAV-Bytes, Dauer-Deckelung,
+  Stille bei leerer Spur, ungültiger `track_index` wirft `ValueError`); die Route in
+  `routes.py` bleibt ungetestet dünn, wie jede andere Route in diesem Projekt auch.
 
 **Mobile:**
 - Reine Score→Farbe/Label-Mapping-Funktion: Unit-Tests für alle drei Schwellenbereiche.
