@@ -490,3 +490,32 @@ def test_score_performance_skips_glide_for_missed_notes():
     }
     assert result["summary"]["glide_flagged_count"] == 0
     assert "haeufiges_hineingleiten" not in result["summary"]["problem_tags"]
+
+
+def test_score_performance_skips_glide_for_timing_flagged_notes():
+    # Gleiche Kopf/Rest-Frame-Konstruktion wie
+    # test_score_performance_flags_glide_and_adds_problem_tag (Kopf abseits, Rest
+    # sauber - rein rechnerisch ein klarer Glide), aber die rohe Aufnahmezeit t liegt
+    # durchgehend 100ms vor aligned_t, was
+    # einen "too_early"-Timing-Befund erzeugt (> TIMING_OK_THRESHOLD_MS=60ms). Das
+    # Gating in score.py darf compute_glide() bei einer timing-geflaggten Note nicht
+    # aufrufen, obwohl die Note weder verfehlt noch cents-rot ist.
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(100)]
+    off_pitch_hz = 440.0 * 2 ** (-80 / 1200)
+    sung_curve = [
+        _sung_frame(round(i * 0.01 - 0.1, 3), off_pitch_hz, aligned_t=round(i * 0.01, 3))
+        for i in range(15)
+    ] + [
+        _sung_frame(round(i * 0.01 - 0.1, 3), 440.0, aligned_t=round(i * 0.01, 3))
+        for i in range(15, 99)
+    ]
+    result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
+    note = result["notes"][0]
+    assert note["missed"] is False
+    assert note["cents_deviation"]["classification"] in ("green", "yellow")
+    assert note["timing"]["classification"] == "too_early"
+    assert note["glide"] == {
+        "applicable": False, "onset_cents_deviation": None, "flag": False, "direction": None,
+    }
+    assert result["summary"]["glide_flagged_count"] == 0
+    assert "haeufiges_hineingleiten" not in result["summary"]["problem_tags"]

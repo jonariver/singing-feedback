@@ -53,7 +53,10 @@ def score_performance(
         drift = compute_phrase_end_drift(note, attributed)
         glide = (
             compute_glide(note, attributed)
-            if not missed and cents and cents["classification"] in ("green", "yellow")
+            if not missed
+            and cents
+            and cents["classification"] in ("green", "yellow")
+            and timing_classification == "on_time"
             else dict(_GLIDE_NOT_APPLICABLE)
         )
 
