@@ -47,6 +47,13 @@ ScoreResult _resultWith(ScoreNote note) {
       glideFlaggedCount: 1,
       overallScore: 100.0,
       problemTags: [],
+      vocalRange: VocalRange(
+        applicable: false,
+        minHz: null,
+        maxHz: null,
+        minMidiNote: null,
+        maxMidiNote: null,
+      ),
     ),
   );
 }

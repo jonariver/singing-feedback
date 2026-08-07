@@ -24,6 +24,13 @@ Map<String, dynamic> _resultJson() => {
         'glide_flagged_count': 1,
         'overall_score': 100.0,
         'problem_tags': <String>[],
+        'vocal_range': {
+          'applicable': true,
+          'min_hz': 196.5,
+          'max_hz': 587.3,
+          'min_midi_note': 55,
+          'max_midi_note': 74,
+        },
       },
     };
 

@@ -82,6 +82,13 @@ ScoreResult _dummyScoreResult({List<String> problemTags = const ['timingprobleme
       glideFlaggedCount: 0,
       overallScore: 85.0,
       problemTags: problemTags,
+      vocalRange: const VocalRange(
+        applicable: false,
+        minHz: null,
+        maxHz: null,
+        minMidiNote: null,
+        maxMidiNote: null,
+      ),
     ),
   );
 }

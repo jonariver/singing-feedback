@@ -95,6 +95,13 @@ class _FakeApiClient extends ApiClient {
           'glide_flagged_count': 1,
           'overall_score': 100.0,
           'problem_tags': <String>[],
+          'vocal_range': {
+            'applicable': false,
+            'min_hz': null,
+            'max_hz': null,
+            'min_midi_note': null,
+            'max_midi_note': null,
+          },
         },
       },
     };

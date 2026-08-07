@@ -120,6 +120,38 @@ class ScoreNote {
       };
 }
 
+class VocalRange {
+  final bool applicable;
+  final double? minHz;
+  final double? maxHz;
+  final int? minMidiNote;
+  final int? maxMidiNote;
+
+  const VocalRange({
+    required this.applicable,
+    required this.minHz,
+    required this.maxHz,
+    required this.minMidiNote,
+    required this.maxMidiNote,
+  });
+
+  factory VocalRange.fromJson(Map<String, dynamic> json) => VocalRange(
+        applicable: json['applicable'] as bool,
+        minHz: (json['min_hz'] as num?)?.toDouble(),
+        maxHz: (json['max_hz'] as num?)?.toDouble(),
+        minMidiNote: json['min_midi_note'] as int?,
+        maxMidiNote: json['max_midi_note'] as int?,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'applicable': applicable,
+        'min_hz': minHz,
+        'max_hz': maxHz,
+        'min_midi_note': minMidiNote,
+        'max_midi_note': maxMidiNote,
+      };
+}
+
 class ScoreSummary {
   final int noteCount;
   final int missedCount;
@@ -132,6 +164,7 @@ class ScoreSummary {
   final int glideFlaggedCount;
   final double overallScore;
   final List<String> problemTags;
+  final VocalRange vocalRange;
 
   const ScoreSummary({
     required this.noteCount,
@@ -145,6 +178,7 @@ class ScoreSummary {
     required this.glideFlaggedCount,
     required this.overallScore,
     required this.problemTags,
+    required this.vocalRange,
   });
 
   factory ScoreSummary.fromJson(Map<String, dynamic> json) => ScoreSummary(
@@ -159,6 +193,7 @@ class ScoreSummary {
         glideFlaggedCount: json['glide_flagged_count'] as int,
         overallScore: (json['overall_score'] as num).toDouble(),
         problemTags: (json['problem_tags'] as List).cast<String>(),
+        vocalRange: VocalRange.fromJson(json['vocal_range'] as Map<String, dynamic>),
       );
 
   Map<String, dynamic> toJson() => {
@@ -173,6 +208,7 @@ class ScoreSummary {
         'glide_flagged_count': glideFlaggedCount,
         'overall_score': overallScore,
         'problem_tags': problemTags,
+        'vocal_range': vocalRange.toJson(),
       };
 }
 
