@@ -302,6 +302,75 @@ def test_compute_stability_flags_genuine_instability():
     assert result["flag"] is True
 
 
+from backend.scoring.glides import compute_glide
+
+
+def test_compute_glide_flags_genuine_glide_and_reports_direction():
+    # Note 1.0-2.0s, Zielton 440Hz. Kopf-Fenster (1.00-1.15s): 15 Frames bei -80 Cent
+    # (deutlich abseits). Rest (1.15-1.99s): 85 Frames exakt auf dem Zielton (sauber
+    # gelandet) - klassischer Glide-von-unten.
+    note = {"start_t": 1.0, "end_t": 2.0, "hz": 440.0}
+    off_pitch_hz = 440.0 * 2 ** (-80 / 1200)
+    head_frames = [
+        _sung_frame(round(1.0 + i * 0.01, 3), off_pitch_hz, aligned_t=round(1.0 + i * 0.01, 3))
+        for i in range(15)
+    ]
+    rest_frames = [
+        _sung_frame(round(1.15 + i * 0.01, 3), 440.0, aligned_t=round(1.15 + i * 0.01, 3))
+        for i in range(85)
+    ]
+    result = compute_glide(note, head_frames + rest_frames)
+    assert result["applicable"] is True
+    assert result["flag"] is True
+    assert result["direction"] == "up"
+    assert result["onset_cents_deviation"] == pytest.approx(-80.0, abs=0.1)
+
+
+def test_compute_glide_does_not_flag_clean_onset():
+    # Note 1.0-2.0s, Zielton 440Hz, durchgehend auf dem Zielton - kein Glide.
+    note = {"start_t": 1.0, "end_t": 2.0, "hz": 440.0}
+    frames = [
+        _sung_frame(round(1.0 + i * 0.01, 3), 440.0, aligned_t=round(1.0 + i * 0.01, 3))
+        for i in range(100)
+    ]
+    result = compute_glide(note, frames)
+    assert result["applicable"] is True
+    assert result["flag"] is False
+    assert result["direction"] is None
+
+
+def test_compute_glide_not_applicable_with_too_few_head_frames():
+    # Nur 2 Frames im Kopf-Fenster (< GLIDE_MIN_HEAD_FRAMES=3), obwohl der Rest der
+    # Note reichlich Frames hat.
+    note = {"start_t": 1.0, "end_t": 2.0, "hz": 440.0}
+    off_pitch_hz = 440.0 * 2 ** (-80 / 1200)
+    head_frames = [
+        _sung_frame(round(1.0 + i * 0.01, 3), off_pitch_hz, aligned_t=round(1.0 + i * 0.01, 3))
+        for i in range(2)
+    ]
+    rest_frames = [
+        _sung_frame(round(1.15 + i * 0.01, 3), 440.0, aligned_t=round(1.15 + i * 0.01, 3))
+        for i in range(85)
+    ]
+    result = compute_glide(note, head_frames + rest_frames)
+    assert result["applicable"] is False
+    assert result["onset_cents_deviation"] is None
+    assert result["flag"] is False
+
+
+def test_compute_glide_not_applicable_when_note_shorter_than_head_window():
+    # Note ist nur 0.1s lang (< GLIDE_HEAD_SECONDS=0.15s) - das ganze Notenfenster
+    # wird zum Kopf-Fenster, es gibt kein Rest-Fenster zum Vergleichen.
+    note = {"start_t": 0.0, "end_t": 0.1, "hz": 440.0}
+    off_pitch_hz = 440.0 * 2 ** (-80 / 1200)
+    frames = [
+        _sung_frame(round(i * 0.01, 3), off_pitch_hz, aligned_t=round(i * 0.01, 3))
+        for i in range(8)
+    ]
+    result = compute_glide(note, frames)
+    assert result["applicable"] is False
+
+
 from backend.scoring import score_performance
 
 

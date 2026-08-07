@@ -19,7 +19,7 @@ from backend.config import (
     STABILITY_MAD_THRESHOLD_CENTS,
     STABILITY_ONSET_TRIM_SECONDS,
 )
-from backend.scoring.notes import hz_to_cents
+from backend.scoring.notes import cents_series, hz_to_cents
 
 _NOT_APPLICABLE_STABILITY = {"applicable": False, "mad_cents": None, "flag": False}
 _NOT_APPLICABLE_DRIFT = {"applicable": False, "drift_cents": None, "flag": False, "direction": None}
@@ -29,19 +29,6 @@ def is_held_note(note: dict) -> bool:
     return (note["end_t"] - note["start_t"]) >= HELD_NOTE_MIN_DURATION_SECONDS
 
 
-def _cents_series(note: dict, attributed_frames: list[dict]) -> list[tuple[float, float]]:
-    """[(aligned_t, cents_deviation), ...] fuer stimmhafte zugeordnete Frames, nach
-    Zeit sortiert."""
-    target_cents = hz_to_cents(note["hz"])
-    series = [
-        (frame["aligned_t"], hz_to_cents(frame["hz"]) - target_cents)
-        for frame in attributed_frames
-        if frame.get("voiced") and frame.get("hz") is not None
-    ]
-    series.sort(key=lambda pair: pair[0])
-    return series
-
-
 def compute_stability(note: dict, attributed_frames: list[dict]) -> dict:
     if not is_held_note(note):
         return dict(_NOT_APPLICABLE_STABILITY)
@@ -49,7 +36,7 @@ def compute_stability(note: dict, attributed_frames: list[dict]) -> dict:
     body_start = note["start_t"] + STABILITY_ONSET_TRIM_SECONDS
     body_end = note["end_t"] - DRIFT_TAIL_SECONDS
     body_values = sorted(
-        c for t, c in _cents_series(note, attributed_frames) if body_start <= t < body_end
+        c for t, c in cents_series(note, attributed_frames) if body_start <= t < body_end
     )
     if not body_values:
         return dict(_NOT_APPLICABLE_STABILITY)
@@ -70,7 +57,7 @@ def compute_phrase_end_drift(note: dict, attributed_frames: list[dict]) -> dict:
 
     body_start = note["start_t"] + STABILITY_ONSET_TRIM_SECONDS
     body_end = note["end_t"] - DRIFT_TAIL_SECONDS
-    series = _cents_series(note, attributed_frames)
+    series = cents_series(note, attributed_frames)
     body_values = sorted(c for t, c in series if body_start <= t < body_end)
     tail_values = sorted(c for t, c in series if t >= body_end)
     if not body_values or not tail_values:

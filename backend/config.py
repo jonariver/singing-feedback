@@ -64,6 +64,12 @@ STABILITY_MAD_THRESHOLD_CENTS = 25.0
 DRIFT_TAIL_SECONDS = 0.3
 DRIFT_FLAG_THRESHOLD_CENTS = 30.0
 
+# Bewertungs-Engine: Glide-Erkennung (Phase 4-Rest, Teil 1) - siehe
+# docs/superpowers/specs/2026-08-07-glide-detection-design.md.
+GLIDE_HEAD_SECONDS = 0.15
+GLIDE_MIN_HEAD_FRAMES = 3
+GLIDE_ONSET_THRESHOLD_CENTS = 60.0
+
 # Groessenschutz fuer POST /api/score (kein Audio-Upload -> MAX_AUDIO_SECONDS greift
 # hier nicht automatisch, da ein Client theoretisch ein ueberlanges JSON-Array direkt
 # posten koennte, ohne ueber /api/audio/analyze bzw. /api/sync/align gegangen zu sein).

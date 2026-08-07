@@ -119,3 +119,17 @@ def attribute_sung_frames(sung_curve: list[dict], note: dict, is_last_note: bool
             continue
         result.append(frame)
     return result
+
+
+def cents_series(note: dict, attributed_frames: list[dict]) -> list[tuple[float, float]]:
+    """[(aligned_t, cents_deviation), ...] fuer stimmhafte zugeordnete Frames, nach
+    Zeit sortiert. Gemeinsamer Helfer fuer stability.py (Stabilitaet/Phrasenend-Drift)
+    und glides.py (Glide-Erkennung)."""
+    target_cents = hz_to_cents(note["hz"])
+    series = [
+        (frame["aligned_t"], hz_to_cents(frame["hz"]) - target_cents)
+        for frame in attributed_frames
+        if frame.get("voiced") and frame.get("hz") is not None
+    ]
+    series.sort(key=lambda pair: pair[0])
+    return series
