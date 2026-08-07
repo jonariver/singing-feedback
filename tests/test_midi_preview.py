@@ -56,3 +56,40 @@ def test_preview_invalid_track_index_raises_value_error():
     pm = _load_reference()
     with pytest.raises(ValueError):
         synthesize_track_preview(pm, track_index=99)
+
+
+def test_preview_clamps_overlapping_notes_to_valid_range(monkeypatch):
+    # Eine einzelne Note erreicht isoliert einen Peak von ca. 0.159 (nicht die
+    # theoretische Obergrenze 0.2, da die Obertoene nicht bei jedem Sample perfekt
+    # phasengleich sind - siehe _note_segment). 8 deckungsgleiche Noten (gleiche
+    # Tonhoehe/Start/Ende) summieren sich konstruktiv auf ueber 1.0 (~1.27 vor einem
+    # Clamp) - provably ueber Vollaussteuerung ohne Clamp.
+    #
+    # sf.write saettigt out-of-range float-Samples beim PCM_16-Default-Subtype selbst
+    # bereits sicher auf [-1, 1] (kein Crash, kein Wrap-Around - empirisch verifiziert),
+    # wodurch ein reiner Check der dekodierten Samples den fehlenden Clamp in
+    # synthesize_track_preview nicht aufdecken wuerde (er waere immer <= 1.0, mit oder
+    # ohne Fix). Daher spionieren wir zusaetzlich das an sf.write uebergebene Array aus,
+    # um den eigentlichen Clamp in synthesize_track_preview zu verifizieren.
+    captured: dict[str, np.ndarray] = {}
+    original_write = sf.write
+
+    def spy_write(file, data, samplerate, **kwargs):
+        captured["data"] = np.array(data, copy=True)
+        return original_write(file, data, samplerate, **kwargs)
+
+    monkeypatch.setattr("backend.midi_analysis.preview.sf.write", spy_write)
+
+    pm = pretty_midi.PrettyMIDI()
+    inst = pretty_midi.Instrument(program=0, name="Chord")
+    for _ in range(8):
+        inst.notes.append(pretty_midi.Note(velocity=127, pitch=69, start=0.0, end=0.5))
+    pm.instruments.append(inst)
+
+    wav_bytes = synthesize_track_preview(pm, track_index=0, max_seconds=1.0)
+
+    assert "data" in captured
+    assert np.max(np.abs(captured["data"])) <= 1.0
+
+    audio, _ = sf.read(io.BytesIO(wav_bytes))
+    assert np.max(np.abs(audio)) <= 1.0

@@ -28,6 +28,9 @@ def _note_segment(freq_hz: float, duration_seconds: float, sample_rate: int) -> 
         signal += amplitude * np.sin(2 * np.pi * freq_hz * harmonic * t)
     signal = signal / sum(_OVERTONE_AMPLITUDES) * 0.2
 
+    if n <= 1:
+        return signal
+
     fade_n = max(1, min(n // 2, int(_ATTACK_RELEASE_SECONDS * sample_rate)))
     envelope = np.ones(n)
     envelope[:fade_n] = np.linspace(0, 1, fade_n)
@@ -65,6 +68,8 @@ def synthesize_track_preview(
             segment = segment[: len(audio) - start_sample]
             end_sample = len(audio)
         audio[start_sample:end_sample] += segment
+
+    audio = np.clip(audio, -1.0, 1.0)
 
     buffer = io.BytesIO()
     sf.write(buffer, audio, sample_rate, format="WAV")
