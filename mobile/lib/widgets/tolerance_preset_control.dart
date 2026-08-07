@@ -15,12 +15,18 @@ class TolerancePresetControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<TolerancePreset>(
-      segments: TolerancePreset.values
-          .map((preset) => ButtonSegment(value: preset, label: Text(preset.label)))
-          .toList(),
-      selected: {value},
-      onSelectionChanged: (selection) => onChanged(selection.first),
+    return Row(
+      children: [
+        const Text('Toleranz:'),
+        const SizedBox(width: 12),
+        SegmentedButton<TolerancePreset>(
+          segments: TolerancePreset.values
+              .map((preset) => ButtonSegment(value: preset, label: Text(preset.label)))
+              .toList(),
+          selected: {value},
+          onSelectionChanged: (selection) => onChanged(selection.first),
+        ),
+      ],
     );
   }
 }

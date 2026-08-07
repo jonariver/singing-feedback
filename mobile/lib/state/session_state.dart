@@ -97,6 +97,7 @@ class SessionState extends ChangeNotifier {
   bool isPlaying = false;
   Uint8List? _playingBytes;
   Object? _playbackGeneration;
+  Object? _scoreGeneration;
 
   /// Baut den Player erst beim ersten tatsaechlichen Gebrauch (nicht im Konstruktor) -
   /// sonst wuerde jeder Test, der irgendwo eine SessionState baut, unabhaengig davon ob
@@ -444,6 +445,7 @@ class SessionState extends ChangeNotifier {
   /// widersprechen sie sich sichtbar.
   Future<void> score() async {
     if (alignedSungCurve.isEmpty) return;
+    final generation = _scoreGeneration = Object();
     feedbackResult = null;
     feedbackStatus = LoadStatus.idle;
     feedbackMessage = '';
@@ -452,10 +454,13 @@ class SessionState extends ChangeNotifier {
     notifyListeners();
     try {
       final targetCurveJson = displayedTargetCurve.map((p) => p.toJson()).toList();
-      scoreResult = await scoreApi.score(targetCurveJson, alignedSungCurve, tolerancePreset);
+      final result = await scoreApi.score(targetCurveJson, alignedSungCurve, tolerancePreset);
+      if (generation != _scoreGeneration) return;
+      scoreResult = result;
       scoreStatus = LoadStatus.ok;
       scoreMessage = 'Bewertung fertig.';
     } catch (e) {
+      if (generation != _scoreGeneration) return;
       scoreStatus = LoadStatus.error;
       scoreMessage = 'Bewertung fehlgeschlagen: ${_messageOf(e)}';
     }

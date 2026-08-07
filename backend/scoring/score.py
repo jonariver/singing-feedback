@@ -56,6 +56,13 @@ def score_performance(
 
         stability = compute_stability(note, attributed)
         drift = compute_phrase_end_drift(note, attributed)
+        # Sowohl die Gate-Bedingung cents["classification"] in ("green", "yellow") als auch
+        # das an compute_glide() weitergereichte green_threshold werden bei einem lockereren
+        # Toleranz-Preset breiter - glide_flagged_count (geht in den Claude-Feedback-Prompt,
+        # siehe backend/feedback/prompt.py) ist damit selbst preset-abhaengig, obwohl das
+        # Toleranz-Preset-Feature laut Spezifikation nur die Cent-Klassifikation skalieren
+        # sollte. Akzeptierter Nebeneffekt (overall_score bleibt nachweislich monoton: ein
+        # lockereres Preset ergibt nie eine schlechtere Bewertung), kein Bug.
         glide = (
             compute_glide(note, attributed, green_threshold)
             if not missed

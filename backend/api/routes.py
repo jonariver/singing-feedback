@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from backend.audio_io import AudioDecodeError, load_audio_signal
 from backend.config import (
+    DEFAULT_CENTS_TOLERANCE_PRESET,
     DTW_FRAME_RATE_HZ,
     MAX_AUDIO_SECONDS,
     MAX_SCORE_CURVE_FRAMES,
@@ -215,7 +216,7 @@ def sync_align(
 class ScoreRequest(BaseModel):
     target_curve: list[dict]
     sung_curve: list[dict]  # muss die AUSGERICHTETE Kurve sein (aligned_t vorhanden)
-    tolerance_preset: str = "normal"
+    tolerance_preset: str = DEFAULT_CENTS_TOLERANCE_PRESET
 
 
 @router.post("/score", dependencies=[Depends(enforce_upload_rate_limit)])
