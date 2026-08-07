@@ -119,7 +119,7 @@ tests/
   driftendes Phrasenende). Das erfüllt Akzeptanzkriterium 10, ohne Urheberrecht zu berühren.
 - Grün/Gelb/Rot-Schwellen zunächst z.B. ±15 Cent (grün), ±50 Cent (gelb), darüber rot —
   anpassbar, sobald reale Testaufnahmen vorliegen.
-- Kurze Ausschnitte (20–60s) zuerst; keine Vollsong-Optimierung in Phase 1–8.
+- Kurze bis mittellange Ausschnitte (bis 300s/5min) zuerst; keine Vollsong-Optimierung in Phase 1–8.
 
 ## Phasenplan
 

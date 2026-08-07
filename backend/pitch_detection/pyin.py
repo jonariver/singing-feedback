@@ -1,7 +1,7 @@
 """Tonhoehenerkennung fuer die Gesangsaufnahme via librosa/pYIN (Phase 1).
 
 Bewusst pYIN statt CREPE (siehe Plan-Annahmen): keine TensorFlow/Torch-Abhaengigkeit,
-laeuft rein auf der CPU, fuer 20-60s-Ausschnitte ausreichend schnell. Das Modul ist
+laeuft rein auf der CPU, fuer Ausschnitte bis zu wenigen Minuten ausreichend schnell. Das Modul ist
 so gekapselt, dass ein Austausch gegen ein anderes Verfahren spaeter moeglich ist,
 ohne die aufrufende API zu aendern.
 """
@@ -49,7 +49,7 @@ def pitch_curve_from_signal(
 def analyze_pitch(
     audio_bytes: bytes,
     filename_hint: str = "upload.wav",
-    max_seconds: float = 90.0,
+    max_seconds: float = 300.0,
     fmin: float = 65.0,
     fmax: float = 1050.0,
     frame_rate_hz: float = 100.0,

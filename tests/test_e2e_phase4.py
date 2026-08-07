@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from backend.audio_io import load_audio_signal
+from backend.config import DTW_FRAME_RATE_HZ
 from backend.midi_analysis import load_midi, track_pitch_curve
 from backend.pitch_detection import pitch_curve_from_signal
 from backend.scoring import score_performance
@@ -27,14 +28,15 @@ def test_scoring_matches_fixture_expectations():
 
     pm = load_midi(midi_path.read_bytes())
     target_curve = track_pitch_curve(pm, track_index=0, frame_rate_hz=100.0)
-    target_envelope = onset_envelope_from_midi_track(pm, track_index=0, frame_rate_hz=100.0)
+    target_envelope = onset_envelope_from_midi_track(pm, track_index=0, frame_rate_hz=DTW_FRAME_RATE_HZ)
 
     y, sr, _ = load_audio_signal(wav_path.read_bytes(), filename_hint="test_vocal.wav")
     sung_curve = pitch_curve_from_signal(y, sr, frame_rate_hz=100.0)
-    sung_envelope = onset_envelope_from_signal(y, sr, frame_rate_hz=100.0)
+    sung_envelope = onset_envelope_from_signal(y, sr, frame_rate_hz=DTW_FRAME_RATE_HZ)
 
     aligned_sung_curve = align_curves(
         target_curve, target_envelope, sung_curve, sung_envelope,
+        envelope_frame_rate_hz=DTW_FRAME_RATE_HZ,
     )["sung_curve"]
 
     score = score_performance(target_curve, aligned_sung_curve)

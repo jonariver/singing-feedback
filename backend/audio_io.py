@@ -52,7 +52,7 @@ def _load_with_pyav(path: str) -> tuple[np.ndarray, int]:
 def load_audio_signal(
     audio_bytes: bytes,
     filename_hint: str = "upload.wav",
-    max_seconds: float = 90.0,
+    max_seconds: float = 300.0,
 ) -> tuple[np.ndarray, int, float]:
     """Dekodiert Audio-Rohbytes zu (Samples, Sample-Rate, Original-Dauer-Sekunden),
     das Sample-Array auf max_seconds gekappt (die dritte Rueckgabe ist immer die

@@ -99,9 +99,14 @@ DTW_BAND_RADIUS = 0.1
 # DTW-Ausrichtung: eigene, niedrigere Frame-Rate nur fuer die Onset-Huellkurve, die in
 # die DTW-Distanzberechnung geht (nicht fuer die Pitch-Kurven, die bleiben bei 100Hz).
 # librosa.sequence.dtw legt trotz Sakoe-Chiba-Band immer eine volle dichte Kosten-/
-# Distanzmatrix an (kein Sparse-Speicher) - bei 100Hz wuerde ein 300s-Kurvenpaar eine
-# ~30000x30000-Matrix (~14-20GB RAM) ergeben. Bei 25Hz sind es nur ~7500x7500
-# (~1,3GB) - siehe docs/superpowers/specs/2026-08-07-longer-recordings-design.md.
+# Distanzmatrix an (kein Sparse-Speicher). Bei 100Hz haette ein 300s-Kurvenpaar eine
+# ~30000x30000-Matrix (~14-20GB RAM) ergeben. Bei 25Hz sind es im symmetrischen Fall
+# (Referenzaufnahme vs. Gesangsaufnahme, beide ~300s) nur ~7500x7500 (~1,3GB, gemessen).
+# Bei einer MIDI-Zielspur erlaubt duration_ratio_exceeds_limit (MAX_DURATION_RATIO=3.0)
+# ein bis zu 3x laengeres Ziel als die Aufnahme - bei einer 300s-Aufnahme also bis zu
+# 900s MIDI-Ziel, gemessene Matrixgroesse ~22500x7500 (~3,4GB RAM). Deutlich unter dem
+# urspruenglichen 100Hz-Risiko, aber kein exakt symmetrischer Fall - siehe
+# docs/superpowers/specs/2026-08-07-longer-recordings-design.md.
 DTW_FRAME_RATE_HZ = 25.0
 
 # Spurerkennung (Phase 2): Gewichteter Score je Kandidat (0-100), ersetzt die reine
