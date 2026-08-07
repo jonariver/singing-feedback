@@ -11,6 +11,8 @@ import 'package:singing_feedback_mobile/api/feedback_api.dart';
 import 'package:singing_feedback_mobile/api/sync_api.dart';
 import 'package:singing_feedback_mobile/models/target_point.dart';
 import 'package:singing_feedback_mobile/state/session_state.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:singing_feedback_mobile/models/tolerance_preset.dart';
 
 class _FakeApiClient extends ApiClient {
   _FakeApiClient() : super(baseUrl: 'http://fake.local');
@@ -215,6 +217,8 @@ SessionState _buildSessionWithPlayback(AudioPlaybackController fake) {
 }
 
 void main() {
+  SharedPreferences.setMockInitialValues({});
+
   test('displayedTargetCurve liefert im MIDI-Modus targetCurve unveraendert', () {
     final session = _buildSession();
     session.setReferenceSource(ReferenceSource.midi);
@@ -836,6 +840,59 @@ void main() {
 
       expect(session.audioTruncated, isFalse);
       expect(session.audioStatus, LoadStatus.ok);
+    });
+  });
+
+  group('SessionState Toleranz-Preset', () {
+    test('tolerancePreset startet mit TolerancePreset.normal', () {
+      final session = _buildSession();
+      expect(session.tolerancePreset, TolerancePreset.normal);
+    });
+
+    test('setTolerancePreset loest bei vorhandenem Score ein erneutes score() '
+        'aus und sendet das Preset mit', () async {
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+      session.setReferenceSource(ReferenceSource.midi);
+      session.midiSessionId = 'sess-1';
+      session.selectedTrackIndex = 0;
+      session.targetCurve = const [TargetPoint(t: 0.0, hz: 440.0, midiNote: 69)];
+      await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+      expect(session.scoreResult, isNotNull);
+
+      await session.setTolerancePreset(TolerancePreset.strict);
+
+      expect(session.tolerancePreset, TolerancePreset.strict);
+      expect(client.lastPostJsonBody?['tolerance_preset'], 'strict');
+    });
+
+    test('setTolerancePreset persistiert das Preset, eine neue SessionState-Instanz '
+        'laedt es per loadPersistedTolerancePreset() zurueck', () async {
+      final sessionA = _buildSession();
+      await sessionA.setTolerancePreset(TolerancePreset.loose);
+
+      final sessionB = _buildSession();
+      expect(sessionB.tolerancePreset, TolerancePreset.normal,
+          reason: 'vor dem Laden noch der Default');
+      await sessionB.loadPersistedTolerancePreset();
+
+      expect(sessionB.tolerancePreset, TolerancePreset.loose);
+    });
+
+    test('loadPersistedTolerancePreset() aendert nichts, wenn nie etwas '
+        'gespeichert wurde', () async {
+      SharedPreferences.setMockInitialValues({});
+      final session = _buildSession();
+
+      await session.loadPersistedTolerancePreset();
+
+      expect(session.tolerancePreset, TolerancePreset.normal);
     });
   });
 }

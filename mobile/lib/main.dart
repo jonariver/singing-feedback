@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 import 'api/api_client.dart';
 import 'api/audio_api.dart';
@@ -22,13 +23,17 @@ class SingingFeedbackApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final apiClient = ApiClient();
     return ChangeNotifierProvider(
-      create: (_) => SessionState(
-        midiApi: MidiApi(apiClient),
-        audioApi: AudioApi(apiClient),
-        syncApi: SyncApi(apiClient),
-        scoreApi: ScoreApi(apiClient),
-        feedbackApi: FeedbackApi(apiClient),
-      ),
+      create: (_) {
+        final session = SessionState(
+          midiApi: MidiApi(apiClient),
+          audioApi: AudioApi(apiClient),
+          syncApi: SyncApi(apiClient),
+          scoreApi: ScoreApi(apiClient),
+          feedbackApi: FeedbackApi(apiClient),
+        );
+        unawaited(session.loadPersistedTolerancePreset());
+        return session;
+      },
       child: MaterialApp(
         title: 'Singing Feedback',
         theme: ThemeData(

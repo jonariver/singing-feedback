@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../api/audio_api.dart';
@@ -14,11 +15,14 @@ import '../api/sync_api.dart';
 import '../models/score_result.dart';
 import '../models/sung_point.dart';
 import '../models/target_point.dart';
+import '../models/tolerance_preset.dart';
 import '../models/track_candidate.dart';
 
 enum LoadStatus { idle, loading, ok, warning, error }
 
 enum ReferenceSource { midi, recording }
+
+const String _tolerancePresetPrefsKey = 'tolerance_preset';
 
 /// Formatiert eine Sekundenzahl als m:ss, z.B. fuer Kuerzungs-Warnmeldungen
 /// ("Aufnahme war 1:56 lang..."). Rundet auf ganze Sekunden.
@@ -196,6 +200,12 @@ class SessionState extends ChangeNotifier {
   LoadStatus alignStatus = LoadStatus.idle;
   String alignMessage = '';
 
+  /// Toleranz-Preset fuer die gruen/gelb/rot-Klassifikation der Cent-Abweichung
+  /// (siehe docs/superpowers/specs/2026-08-07-tolerance-preset-design.md).
+  /// Startet synchron mit dem Default; ein zuvor gespeicherter Wert wird erst
+  /// asynchron per loadPersistedTolerancePreset() nachgeladen (siehe dort).
+  TolerancePreset tolerancePreset = TolerancePreset.normal;
+
   ScoreResult? scoreResult;
   LoadStatus scoreStatus = LoadStatus.idle;
   String scoreMessage = '';
@@ -326,6 +336,29 @@ class SessionState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setTolerancePreset(TolerancePreset preset) async {
+    tolerancePreset = preset;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tolerancePresetPrefsKey, preset.apiValue);
+    if (alignedSungCurve.isNotEmpty) await score();
+  }
+
+  /// Laedt ein zuvor gespeichertes Toleranz-Preset (falls vorhanden) und wendet
+  /// es an - bewusst NICHT im Konstruktor, sondern nur von main.dart nach dem
+  /// Bauen dieser SessionState aufgerufen (fire-and-forget), damit kein Test,
+  /// der eine SessionState baut, ungewollt einen SharedPreferences-
+  /// Plattform-Kanal-Zugriff ausloest (gleiches Prinzip wie beim lazy
+  /// _playbackController weiter oben in dieser Datei).
+  Future<void> loadPersistedTolerancePreset() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = TolerancePreset.fromApiValue(prefs.getString(_tolerancePresetPrefsKey));
+    if (stored != null && stored != tolerancePreset) {
+      tolerancePreset = stored;
+      notifyListeners();
+    }
+  }
+
   Future<void> analyzeAudio(Uint8List bytes, String filename) async {
     sungAudioBytes = bytes;
     sungAudioFilename = filename;
@@ -419,7 +452,7 @@ class SessionState extends ChangeNotifier {
     notifyListeners();
     try {
       final targetCurveJson = displayedTargetCurve.map((p) => p.toJson()).toList();
-      scoreResult = await scoreApi.score(targetCurveJson, alignedSungCurve);
+      scoreResult = await scoreApi.score(targetCurveJson, alignedSungCurve, tolerancePreset);
       scoreStatus = LoadStatus.ok;
       scoreMessage = 'Bewertung fertig.';
     } catch (e) {
