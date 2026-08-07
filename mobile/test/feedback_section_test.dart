@@ -79,6 +79,7 @@ ScoreResult _dummyScoreResult({List<String> problemTags = const ['timingprobleme
       timingFlaggedCount: 1,
       stabilityFlaggedCount: 0,
       phraseEndDriftFlaggedCount: 0,
+      glideFlaggedCount: 0,
       overallScore: 85.0,
       problemTags: problemTags,
     ),

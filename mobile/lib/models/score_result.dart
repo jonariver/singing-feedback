@@ -21,6 +21,10 @@ class ScoreNote {
   final double? driftCents;
   final bool phraseEndDriftFlag;
   final String? driftDirection;
+  final bool glideApplicable;
+  final double? glideOnsetCentsDeviation;
+  final bool glideFlag;
+  final String? glideDirection;
   final double? sungT;
 
   const ScoreNote({
@@ -43,6 +47,10 @@ class ScoreNote {
     required this.driftCents,
     required this.phraseEndDriftFlag,
     required this.driftDirection,
+    required this.glideApplicable,
+    required this.glideOnsetCentsDeviation,
+    required this.glideFlag,
+    required this.glideDirection,
     required this.sungT,
   });
 
@@ -51,6 +59,7 @@ class ScoreNote {
     final timing = json['timing'] as Map<String, dynamic>;
     final stability = json['stability'] as Map<String, dynamic>;
     final drift = json['phrase_end_drift'] as Map<String, dynamic>;
+    final glide = json['glide'] as Map<String, dynamic>;
     return ScoreNote(
       index: json['index'] as int,
       startT: (json['start_t'] as num).toDouble(),
@@ -71,6 +80,10 @@ class ScoreNote {
       driftCents: (drift['drift_cents'] as num?)?.toDouble(),
       phraseEndDriftFlag: drift['flag'] as bool,
       driftDirection: drift['direction'] as String?,
+      glideApplicable: glide['applicable'] as bool,
+      glideOnsetCentsDeviation: (glide['onset_cents_deviation'] as num?)?.toDouble(),
+      glideFlag: glide['flag'] as bool,
+      glideDirection: glide['direction'] as String?,
       sungT: (json['sung_t'] as num?)?.toDouble(),
     );
   }
@@ -97,6 +110,12 @@ class ScoreNote {
           'flag': phraseEndDriftFlag,
           'direction': driftDirection,
         },
+        'glide': {
+          'applicable': glideApplicable,
+          'onset_cents_deviation': glideOnsetCentsDeviation,
+          'flag': glideFlag,
+          'direction': glideDirection,
+        },
         'sung_t': sungT,
       };
 }
@@ -110,6 +129,7 @@ class ScoreSummary {
   final int timingFlaggedCount;
   final int stabilityFlaggedCount;
   final int phraseEndDriftFlaggedCount;
+  final int glideFlaggedCount;
   final double overallScore;
   final List<String> problemTags;
 
@@ -122,6 +142,7 @@ class ScoreSummary {
     required this.timingFlaggedCount,
     required this.stabilityFlaggedCount,
     required this.phraseEndDriftFlaggedCount,
+    required this.glideFlaggedCount,
     required this.overallScore,
     required this.problemTags,
   });
@@ -135,6 +156,7 @@ class ScoreSummary {
         timingFlaggedCount: json['timing_flagged_count'] as int,
         stabilityFlaggedCount: json['stability_flagged_count'] as int,
         phraseEndDriftFlaggedCount: json['phrase_end_drift_flagged_count'] as int,
+        glideFlaggedCount: json['glide_flagged_count'] as int,
         overallScore: (json['overall_score'] as num).toDouble(),
         problemTags: (json['problem_tags'] as List).cast<String>(),
       );
@@ -148,6 +170,7 @@ class ScoreSummary {
         'timing_flagged_count': timingFlaggedCount,
         'stability_flagged_count': stabilityFlaggedCount,
         'phrase_end_drift_flagged_count': phraseEndDriftFlaggedCount,
+        'glide_flagged_count': glideFlaggedCount,
         'overall_score': overallScore,
         'problem_tags': problemTags,
       };

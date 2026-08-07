@@ -10,6 +10,7 @@ Map<String, dynamic> _noteJson() => {
       'held': true,
       'stability': {'applicable': true, 'mad_cents': 0.8, 'flag': false},
       'phrase_end_drift': {'applicable': true, 'drift_cents': 0.3, 'flag': false, 'direction': null},
+      'glide': {'applicable': true, 'onset_cents_deviation': -62.0, 'flag': true, 'direction': 'up'},
       'sung_t': 0.12,
     };
 
@@ -20,6 +21,7 @@ Map<String, dynamic> _resultJson() => {
         'cents_green': 1, 'cents_yellow': 0, 'cents_red': 0,
         'timing_flagged_count': 0, 'stability_flagged_count': 0,
         'phrase_end_drift_flagged_count': 0,
+        'glide_flagged_count': 1,
         'overall_score': 100.0,
         'problem_tags': <String>[],
       },
