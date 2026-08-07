@@ -127,7 +127,7 @@ def analyze_audio(request: Request, file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=413, detail="Audiodatei ist unerwartet gross.")
 
     try:
-        curve = analyze_pitch(
+        result = analyze_pitch(
             data,
             filename_hint=file.filename or "upload.wav",
             max_seconds=MAX_AUDIO_SECONDS,
@@ -137,7 +137,7 @@ def analyze_audio(request: Request, file: UploadFile = File(...)) -> dict:
     except PitchAnalysisError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return {"curve": curve}
+    return result
 
 
 @router.post("/sync/align", dependencies=[Depends(enforce_upload_rate_limit)])
