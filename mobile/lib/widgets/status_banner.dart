@@ -14,6 +14,7 @@ class StatusBanner extends StatelessWidget {
     final Color color = switch (status) {
       LoadStatus.error => Colors.red.shade300,
       LoadStatus.ok => Colors.green.shade300,
+      LoadStatus.warning => Colors.orange.shade300,
       _ => Colors.grey.shade400,
     };
     return Padding(
