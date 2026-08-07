@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from backend.audio_io import AudioDecodeError, load_audio_signal
 from backend.config import (
+    DTW_FRAME_RATE_HZ,
     MAX_AUDIO_SECONDS,
     MAX_SCORE_CURVE_FRAMES,
     MAX_SCORE_REQUEST_BYTES,
@@ -159,7 +160,7 @@ def sync_align(
     except AudioDecodeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     sung_curve = pitch_curve_from_signal(y_sung, sr_sung, fmin=PITCH_FMIN_HZ, fmax=PITCH_FMAX_HZ)
-    sung_envelope = onset_envelope_from_signal(y_sung, sr_sung)
+    sung_envelope = onset_envelope_from_signal(y_sung, sr_sung, frame_rate_hz=DTW_FRAME_RATE_HZ)
 
     if reference_audio is not None:
         ref_bytes = reference_audio.file.read()
@@ -172,7 +173,7 @@ def sync_align(
         except AudioDecodeError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         target_curve = pitch_curve_from_signal(y_ref, sr_ref, fmin=PITCH_FMIN_HZ, fmax=PITCH_FMAX_HZ)
-        target_envelope = onset_envelope_from_signal(y_ref, sr_ref)
+        target_envelope = onset_envelope_from_signal(y_ref, sr_ref, frame_rate_hz=DTW_FRAME_RATE_HZ)
     elif session_id is not None and track_index is not None:
         pm = MIDI_SESSIONS.get(session_id)
         if pm is None:
@@ -182,7 +183,7 @@ def sync_align(
             )
         try:
             target_curve = track_pitch_curve(pm, track_index, transpose_semitones=transpose)
-            target_envelope = onset_envelope_from_midi_track(pm, track_index)
+            target_envelope = onset_envelope_from_midi_track(pm, track_index, frame_rate_hz=DTW_FRAME_RATE_HZ)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     else:
@@ -204,7 +205,10 @@ def sync_align(
             ),
         )
 
-    result = align_curves(target_curve, target_envelope, sung_curve, sung_envelope)
+    result = align_curves(
+        target_curve, target_envelope, sung_curve, sung_envelope,
+        envelope_frame_rate_hz=DTW_FRAME_RATE_HZ,
+    )
     return {"target_curve": target_curve, **result}
 
 
