@@ -33,6 +33,10 @@ class ScoreSummaryView extends StatelessWidget {
       final direction = note.driftDirection == 'up' ? 'steigt an' : 'sackt ab';
       parts.add('Phrasenende $direction');
     }
+    if (note.glideFlag) {
+      final direction = note.glideDirection == 'up' ? 'von unten' : 'von oben';
+      parts.add('gerutscht ($direction)');
+    }
     if (note.stabilityFlag) parts.add('instabil');
     if (note.missed) parts.add('verfehlt');
     return 'Note ${note.index + 1}: ${parts.join(' · ')}';
