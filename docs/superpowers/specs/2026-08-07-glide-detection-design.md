@@ -82,11 +82,24 @@ Startwerte, iterativ anpassbar, keine harten Testwerte.
 
 ### Integration in `score.py`
 
-**Gating:** `compute_glide()` wird nur aufgerufen, wenn die Note **nicht** `missed` ist
-und ihre `cents_deviation.classification` grün oder gelb ist — gleiches Muster wie das
-bestehende Gating von `timing_classification` (`if not missed and onset_ms is not None:
-...`). Sonst wird direkt der `applicable=False`-Default gesetzt, ohne
-`compute_glide()` aufzurufen.
+**Gating:** `compute_glide()` wird nur aufgerufen, wenn die Note **nicht** `missed` ist,
+ihre `cents_deviation.classification` grün oder gelb ist, **und** ihre
+`timing.classification` `"on_time"` ist. Sonst wird direkt der `applicable=False`-Default
+gesetzt, ohne `compute_glide()` aufzurufen.
+
+**Nachtrag (während der Implementierung entdeckt, Entscheidung mit dem Nutzer
+abgestimmt):** Die dritte Bedingung (`timing_classification == "on_time"`) war in der
+ursprünglichen Fassung dieser Spec nicht vorgesehen — die Design-Annahme war, dass
+Timing (wann) und Tonhöhe (Glide) unabhängige Achsen sind. Der Implementierungs-Plan
+für Task 2 zeigte einen realen Interaktionseffekt: Bei einer Note mit signifikanter
+Einsatz-Timing-Korrektur (z. B. 150ms zu früh gesungen) verschmiert `align_curves()`s
+DTW-Zeitverzerrung die ausgerichtete Tonhöhenkurve am Notenübergang zu einer echten
+Rampe (in einem beobachteten Fall: -220 bis 0 Cent innerhalb von ~150ms) — das trifft
+den Glide-Schwellenwert, obwohl der Sänger keinen echten Glide gesungen hat, sondern
+schlicht zu früh eingesetzt hat. Eine Note, die eine DTW-Zeitkorrektur brauchte, ist
+also gerade die Art Note, deren ausgerichtete Kopf-Frames am unzuverlässigsten sind.
+Die Timing-Bedingung schließt genau diesen Fall aus, ohne die Kernlogik in
+`glides.py`/die Schwellenwerte anzufassen.
 
 - Neues Notenfeld: `"glide": {...}` (Form oben).
 - Neue Summary-Zahl: `"glide_flagged_count"`.
