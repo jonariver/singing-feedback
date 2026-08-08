@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../state/session_state.dart';
 import '../widgets/pitch_chart.dart';
 import '../widgets/playback_button.dart';
+import '../widgets/playback_seekbar.dart';
 import '../widgets/recording_control.dart';
 import '../widgets/feedback_section.dart';
 import '../widgets/score_summary_view.dart';
@@ -80,6 +81,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              PlaybackSeekbar(audioBytes: session.referenceAudioBytes),
             ],
             if (session.audioSectionEnabled) ...[
               const SizedBox(height: 8),
@@ -116,6 +118,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
             ),
+            PlaybackSeekbar(audioBytes: session.sungAudioBytes),
             const Divider(height: 32),
             Text('3. Tonhöhen-Vergleich', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
