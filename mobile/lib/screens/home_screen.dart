@@ -10,6 +10,7 @@ import '../widgets/recording_control.dart';
 import '../widgets/feedback_section.dart';
 import '../widgets/score_summary_view.dart';
 import '../widgets/tolerance_preset_control.dart';
+import '../widgets/feedback_provider_control.dart';
 import '../widgets/share_button.dart';
 import '../widgets/status_banner.dart';
 import '../widgets/track_candidate_card.dart';
@@ -150,6 +151,10 @@ class HomeScreen extends StatelessWidget {
             const Divider(height: 32),
             Text('5. Feedback', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
+            FeedbackProviderControl(
+              value: session.feedbackProvider,
+              onChanged: (provider) => session.setFeedbackProvider(provider),
+            ),
             FeedbackSection(session: session),
           ],
         ),
