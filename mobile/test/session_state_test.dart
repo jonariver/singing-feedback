@@ -750,6 +750,99 @@ void main() {
       expect(fake.stopCallCount, 1);
       expect(session.isPlaying, isFalse);
     });
+
+    test('positionFor/durationFor liefern Duration.zero fuer Bytes, die nicht _playingBytes sind',
+        () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      final otherBytes = Uint8List.fromList([4, 5, 6]);
+
+      await session.play(bytes);
+
+      expect(session.positionFor(otherBytes), Duration.zero);
+      expect(session.durationFor(otherBytes), Duration.zero);
+      expect(session.positionFor(null), Duration.zero);
+      expect(session.durationFor(null), Duration.zero);
+    });
+
+    test('ein Positions-/Dauer-Tick des Fake-Controllers erscheint in positionFor/durationFor',
+        () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await session.play(bytes);
+      fake._positionChangedController.add(const Duration(seconds: 2));
+      fake._durationChangedController.add(const Duration(seconds: 10));
+      // Stream-Events laufen als Microtask - kurz nachgeben, bevor gelesen wird.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(session.positionFor(bytes), const Duration(seconds: 2));
+      expect(session.durationFor(bytes), const Duration(seconds: 10));
+    });
+
+    test(
+        'Trackwechsel setzt positionFor/durationFor fuer die alte Spur synchron sofort '
+        'auf Duration.zero zurueck, noch bevor ein neuer Tick fuer die neue Spur eintrifft',
+        () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      final otherBytes = Uint8List.fromList([4, 5, 6]);
+
+      await session.play(bytes);
+      fake._positionChangedController.add(const Duration(seconds: 2));
+      fake._durationChangedController.add(const Duration(seconds: 10));
+      await Future<void>.delayed(Duration.zero);
+      expect(session.positionFor(bytes), const Duration(seconds: 2));
+
+      // play() fuer eine neue Spur haengt in fake.play() fest (Completer offen) -
+      // der Reset muss trotzdem schon VOR dem Abschluss des await sichtbar sein.
+      fake.playCompleter = Completer<void>();
+      final secondCall = session.play(otherBytes);
+
+      expect(session.positionFor(bytes), Duration.zero);
+      expect(session.durationFor(bytes), Duration.zero);
+      expect(session.positionFor(otherBytes), Duration.zero);
+
+      fake.playCompleter!.complete();
+      await secondCall;
+    });
+
+    test(
+        'Bloßes Erzeugen einer SessionState und Abonnieren von onPositionChanged baut den '
+        'lazy Player nicht (Regressionsschutz fuer die Lazy-Invariante)', () {
+      var buildCount = 0;
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+        playbackControllerFactory: () {
+          buildCount++;
+          return _FakePlaybackController();
+        },
+      );
+
+      final sub = session.onPositionChanged.listen((_) {});
+      final sub2 = session.onDurationChanged.listen((_) {});
+
+      expect(buildCount, 0);
+      sub.cancel();
+      sub2.cancel();
+    });
+
+    test('dispose() wirft nicht und raeumt die Positions-/Dauer-Subscriptions und -Controller auf',
+        () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      await session.play(Uint8List.fromList([1, 2, 3]));
+
+      expect(() => session.dispose(), returnsNormally);
+    });
   });
 
   group('SessionState Spur-Vorschau (previewBytesForTrack)', () {

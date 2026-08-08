@@ -102,10 +102,26 @@ class SessionState extends ChangeNotifier {
 
   AudioPlaybackController? _playbackControllerInstance;
   StreamSubscription<void>? _playbackCompleteSubscription;
+  StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<Duration>? _durationSubscription;
+  final _positionController = StreamController<Duration>.broadcast();
+  final _durationController = StreamController<Duration>.broadcast();
+  Duration _lastKnownPosition = Duration.zero;
+  Duration _lastKnownDuration = Duration.zero;
   bool isPlaying = false;
   Uint8List? _playingBytes;
   Object? _playbackGeneration;
   Object? _scoreGeneration;
+
+  /// Rohe Positions-/Dauer-Ticks des geteilten Players, ungefiltert nach Bytes-
+  /// Identitaet (siehe positionFor()/durationFor() unten fuer die gefilterte Sicht).
+  /// Bewusst NICHT an notifyListeners() gekoppelt (siehe Global Constraints im
+  /// Implementierungsplan) - sonst wuerde context.watch<SessionState>() in
+  /// HomeScreen mehrmals pro Sekunde waehrend der Wiedergabe den ganzen Baum neu
+  /// bauen. Widgets, die live mitlaufen wollen (z.B. ein Seekbar-Slider), abonnieren
+  /// diese Streams direkt statt sich auf notifyListeners() zu verlassen.
+  Stream<Duration> get onPositionChanged => _positionController.stream;
+  Stream<Duration> get onDurationChanged => _durationController.stream;
 
   /// Baut den Player erst beim ersten tatsaechlichen Gebrauch (nicht im Konstruktor) -
   /// sonst wuerde jeder Test, der irgendwo eine SessionState baut, unabhaengig davon ob
@@ -120,6 +136,14 @@ class SessionState extends ChangeNotifier {
         isPlaying = false;
         notifyListeners();
       });
+      _positionSubscription = instance.onPositionChanged.listen((d) {
+        _lastKnownPosition = d;
+        _positionController.add(d);
+      });
+      _durationSubscription = instance.onDurationChanged.listen((d) {
+        _lastKnownDuration = d;
+        _durationController.add(d);
+      });
     }
     return instance;
   }
@@ -132,9 +156,22 @@ class SessionState extends ChangeNotifier {
   bool isPlayingAudio(Uint8List? bytes) =>
       isPlaying && bytes != null && identical(_playingBytes, bytes);
 
+  /// Letzter bekannter Positions-/Dauer-Tick, aber nur wenn `bytes` gerade die
+  /// abgespielte Spur ist (gleiche Objekt-Identitaet wie isPlayingAudio()) - sonst
+  /// Duration.zero. Damit zeigen mehrere Seekbar-Instanzen (Referenz- und
+  /// Gesangsaufnahme) trotz gemeinsamem Player nur fuer die tatsaechlich laufende
+  /// Spur eine Position an.
+  Duration positionFor(Uint8List? bytes) =>
+      identical(_playingBytes, bytes) ? _lastKnownPosition : Duration.zero;
+
+  Duration durationFor(Uint8List? bytes) =>
+      identical(_playingBytes, bytes) ? _lastKnownDuration : Duration.zero;
+
   Future<void> play(Uint8List bytes) async {
     final generation = _playbackGeneration = Object();
     _playingBytes = bytes;
+    _lastKnownPosition = Duration.zero;
+    _lastKnownDuration = Duration.zero;
     await _playbackController.play(bytes);
     if (generation != _playbackGeneration) return;
     isPlaying = true;
@@ -144,6 +181,8 @@ class SessionState extends ChangeNotifier {
   Future<void> playFrom(Uint8List bytes, Duration position) async {
     final generation = _playbackGeneration = Object();
     _playingBytes = bytes;
+    _lastKnownPosition = Duration.zero;
+    _lastKnownDuration = Duration.zero;
     await _playbackController.playFrom(bytes, position);
     if (generation != _playbackGeneration) return;
     isPlaying = true;
@@ -177,6 +216,10 @@ class SessionState extends ChangeNotifier {
   @override
   void dispose() {
     _playbackCompleteSubscription?.cancel();
+    _positionSubscription?.cancel();
+    _durationSubscription?.cancel();
+    unawaited(_positionController.close());
+    unawaited(_durationController.close());
     _playbackControllerInstance?.dispose();
     super.dispose();
   }
