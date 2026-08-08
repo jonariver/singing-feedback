@@ -565,3 +565,50 @@ def test_generate_feedback_jump_to_t_is_none_when_no_note_matches(monkeypatch):
     fake = _FakeMessagesClient(points=[{"problem": "X", "uebung_id": "absinkende_phrasenenden"}])
     result = generate_feedback(score_result, messages_client_factory=lambda: fake)
     assert result["points"][0]["jump_to_t"] is None
+
+
+def test_generate_feedback_uses_cloudflare_when_provider_is_cloudflare(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.CLOUDFLARE_ACCOUNT_ID", "acct123")
+    monkeypatch.setattr("backend.feedback.generate.CLOUDFLARE_API_TOKEN", "tok456")
+    notes = [_note(0, timing_classification="too_late", timing_deviation_ms=250.0, sung_t=1.0)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["timingprobleme"]
+    fake = _FakeCloudflareClient(
+        tool_calls=[{
+            "name": "return_feedback_points",
+            "arguments": {"points": [{"problem": "Timing daneben", "uebung_id": "timingprobleme"}]},
+        }]
+    )
+    result = generate_feedback(
+        score_result, provider="cloudflare", cloudflare_client_factory=lambda: fake,
+    )
+    assert result["points"][0]["problem"] == "Timing daneben"
+    assert fake.last_kwargs["model"] == "@cf/qwen/qwen3-30b-a3b-fp8"
+
+
+def test_generate_feedback_raises_when_cloudflare_credentials_missing(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.CLOUDFLARE_ACCOUNT_ID", "")
+    monkeypatch.setattr("backend.feedback.generate.CLOUDFLARE_API_TOKEN", "")
+    notes = [_note(0, timing_classification="too_late", timing_deviation_ms=250.0)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["timingprobleme"]
+    with pytest.raises(FeedbackUnavailableError):
+        generate_feedback(score_result, provider="cloudflare")
+
+
+def test_generate_feedback_raises_on_unknown_provider():
+    notes = [_note(0, timing_classification="too_late", timing_deviation_ms=250.0)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["timingprobleme"]
+    with pytest.raises(FeedbackUnavailableError):
+        generate_feedback(score_result, provider="does_not_exist")
+
+
+def test_generate_feedback_still_defaults_to_anthropic(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.ANTHROPIC_API_KEY", "dummy-key")
+    notes = [_note(0, timing_classification="too_late", timing_deviation_ms=250.0)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["timingprobleme"]
+    fake = _FakeMessagesClient(points=[{"problem": "Timing", "uebung_id": "timingprobleme"}])
+    result = generate_feedback(score_result, messages_client_factory=lambda: fake)
+    assert result["points"][0]["problem"] == "Timing"

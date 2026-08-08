@@ -9,8 +9,11 @@ from typing import Any, Callable
 import anthropic
 
 from backend.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
+from backend.config import CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, CLOUDFLARE_MODEL
 from backend.feedback.catalog import catalog_ids, load_catalog, lookup
 from backend.feedback.client import request_feedback_points
+from backend.feedback.cloudflare_client import CloudflareWorkersAIClient
+from backend.feedback.cloudflare_client import request_feedback_points as request_feedback_points_cloudflare
 from backend.feedback.prompt import build_prompt_context, build_prompt_text
 
 
@@ -89,33 +92,54 @@ def _find_jump_to_t(flagged_notes: list[dict], uebung_id: str, used_notes: set[i
 
 def generate_feedback(
     score_result: dict,
+    provider: str = "anthropic",
     messages_client_factory: Callable[[], Any] | None = None,
+    cloudflare_client_factory: Callable[[], Any] | None = None,
 ) -> dict:
     """Liefert {"points": [...]} mit bis zu 3 Punkten (problem, technik, uebung,
     wiederholungsaufgabe, jump_to_t). Leere Liste, wenn score_result["summary"]
-    ["problem_tags"] leer ist (kein API-Aufruf noetig). Wirft FeedbackUnavailableError,
-    wenn der API-Key fehlt oder der Anthropic-Aufruf fehlschlaegt. jump_to_t ist die
-    Position (Sekunden) in der eigenen Aufnahme der ersten unverbrauchten Note dieser
-    Kategorie mit Zeitstelle, oder None. messages_client_factory ist injizierbar fuer
-    Tests (siehe test_feedback.py) - Default baut einen echten anthropic.Anthropic-
-    Client."""
+    ["problem_tags"] leer ist (kein API-Aufruf noetig). provider ist "anthropic"
+    (Default) oder "cloudflare" - waehlt, welcher externe Anbieter fuer die
+    Feedback-Generierung genutzt wird (siehe
+    docs/superpowers/specs/2026-08-08-cloudflare-feedback-provider-design.md).
+    Wirft FeedbackUnavailableError, wenn die noetigen Zugangsdaten fuer den
+    gewaehlten Provider fehlen, der Provider unbekannt ist, oder der externe
+    Aufruf fehlschlaegt. jump_to_t ist die Position (Sekunden) in der eigenen
+    Aufnahme der ersten unverbrauchten Note dieser Kategorie mit Zeitstelle,
+    oder None. messages_client_factory/cloudflare_client_factory sind
+    injizierbar fuer Tests (siehe test_feedback.py) - Default baut jeweils
+    einen echten Client fuer den gewaehlten Provider."""
     if not score_result["summary"]["problem_tags"]:
         return {"points": []}
 
-    if not ANTHROPIC_API_KEY:
+    if provider == "anthropic":
+        if not ANTHROPIC_API_KEY:
+            raise FeedbackUnavailableError(_UNAVAILABLE_MESSAGE)
+        if messages_client_factory is None:
+            messages_client_factory = lambda: anthropic.Anthropic(api_key=ANTHROPIC_API_KEY).messages
+    elif provider == "cloudflare":
+        if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
+            raise FeedbackUnavailableError(_UNAVAILABLE_MESSAGE)
+        if cloudflare_client_factory is None:
+            cloudflare_client_factory = lambda: CloudflareWorkersAIClient(
+                CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN
+            )
+    else:
         raise FeedbackUnavailableError(_UNAVAILABLE_MESSAGE)
-
-    if messages_client_factory is None:
-        messages_client_factory = lambda: anthropic.Anthropic(api_key=ANTHROPIC_API_KEY).messages
 
     catalog = load_catalog()
     context = build_prompt_context(score_result)
     prompt_text = build_prompt_text(context)
 
     try:
-        raw_points = request_feedback_points(
-            messages_client_factory(), ANTHROPIC_MODEL, prompt_text, catalog_ids(catalog)
-        )
+        if provider == "anthropic":
+            raw_points = request_feedback_points(
+                messages_client_factory(), ANTHROPIC_MODEL, prompt_text, catalog_ids(catalog)
+            )
+        else:
+            raw_points = request_feedback_points_cloudflare(
+                cloudflare_client_factory(), CLOUDFLARE_MODEL, prompt_text, catalog_ids(catalog)
+            )
     except Exception as exc:
         raise FeedbackUnavailableError(_UNAVAILABLE_MESSAGE) from exc
 

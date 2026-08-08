@@ -238,13 +238,14 @@ def score(request: Request, body: ScoreRequest) -> dict:
 
 class FeedbackRequest(BaseModel):
     score: dict  # ScoreResult, wie von /api/score unter "score" zurueckgegeben
+    provider: str = "anthropic"
 
 
 @router.post("/feedback", dependencies=[Depends(enforce_upload_rate_limit)])
 def feedback(request: Request, body: FeedbackRequest) -> dict:
     _reject_oversized_content_length(request, MAX_SCORE_REQUEST_BYTES)
     try:
-        result = generate_feedback(body.score)
+        result = generate_feedback(body.score, provider=body.provider)
     except FeedbackUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except (KeyError, TypeError) as exc:
