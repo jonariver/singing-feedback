@@ -731,15 +731,27 @@ def test_score_performance_flags_pause_and_adds_problem_tag():
 
 
 def test_score_performance_skips_pause_for_missed_notes():
-    # Zielnote 3.0s. Gesang deckt nur die ersten 0.30s ab (Coverage ca. 8% -> verfehlt),
-    # der Rest der Note ist komplett unstimmhaft - rein rechnerisch eine riesige
-    # "Luecke", aber das Gating in score.py darf compute_pause() bei einer verfehlten
-    # Note gar nicht erst aufrufen.
+    # Zielnote 3.0s. Gesang deckt nur die ersten 0.30s ab (Coverage ca. 8% -> verfehlt,
+    # da unstimmhafte Frames nicht zur Coverage zaehlen), gefolgt von einem expliziten,
+    # langen Lauf unstimmhafter Frames (0.30s-2.99s), der - fuer sich genommen - genau
+    # die Art von Luecke ist, die compute_pause() als Pause flaggen wuerde (siehe
+    # test_score_performance_flags_pause_and_adds_problem_tag). Diese Frames sind hier
+    # bewusst explizit als voiced=False konstruiert (nicht bloss als abrupt endende
+    # Frame-Liste), damit compute_pause()'s Lauf-Scan tatsaechlich etwas zum Scannen
+    # hat. Das Gating in score.py darf compute_pause() bei einer verfehlten Note aber
+    # gar nicht erst aufrufen - dieser Test beweist das, indem er sicherstellt, dass die
+    # zugrunde liegenden Frame-Daten, waeren sie ungegated, wirklich ein flag=True
+    # produzieren wuerden.
     target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(300)]
-    sung_curve = [
+    voiced_head = [
         _sung_frame(round(0.05 + i * 0.01, 3), 440.0, aligned_t=round(0.05 + i * 0.01, 3))
         for i in range(25)
     ]
+    unvoiced_tail = [
+        _sung_frame(round(0.30 + i * 0.01, 3), None, voiced=False, aligned_t=round(0.30 + i * 0.01, 3))
+        for i in range(270)
+    ]
+    sung_curve = voiced_head + unvoiced_tail
     result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
     note = result["notes"][0]
     assert note["missed"] is True
