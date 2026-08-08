@@ -270,6 +270,106 @@ def test_request_feedback_points_unwraps_doubly_nested_points():
     assert result == real_points
 
 
+from backend.feedback.cloudflare_client import (
+    CloudflareWorkersAIClient,
+    request_feedback_points as cloudflare_request_feedback_points,
+)
+
+
+class _FakeCloudflareClient:
+    def __init__(self, tool_calls=None, raise_error=None):
+        self._tool_calls = tool_calls if tool_calls is not None else []
+        self._raise_error = raise_error
+        self.last_kwargs = None
+
+    def create(self, **kwargs):
+        self.last_kwargs = kwargs
+        if self._raise_error:
+            raise self._raise_error
+        return {
+            "result": {"tool_calls": self._tool_calls},
+            "success": True,
+            "errors": [],
+            "messages": [],
+        }
+
+
+def test_cloudflare_request_feedback_points_extracts_points_from_tool_call():
+    fake = _FakeCloudflareClient(
+        tool_calls=[{"name": "return_feedback_points", "arguments": {"points": [{"problem": "P", "uebung_id": "a"}]}}]
+    )
+    points = cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"])
+    assert points == [{"problem": "P", "uebung_id": "a"}]
+
+
+def test_cloudflare_request_feedback_points_parses_stringified_arguments():
+    # Workers AI's "arguments" ist laut Dokumentation vom Typ "unknown" - manche
+    # Modelle liefern es als JSON-String statt als bereits geparstes Objekt.
+    import json
+
+    fake = _FakeCloudflareClient(
+        tool_calls=[{
+            "name": "return_feedback_points",
+            "arguments": json.dumps({"points": [{"problem": "P", "uebung_id": "a"}]}),
+        }]
+    )
+    points = cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"])
+    assert points == [{"problem": "P", "uebung_id": "a"}]
+
+
+def test_cloudflare_request_feedback_points_reuses_normalize_points_for_malformed_shapes():
+    # Derselbe doppelt verschachtelte Fall wie bei Anthropic live beobachtet -
+    # beweist, dass _normalize_points() tatsaechlich wiederverwendet wird, nicht
+    # eine zweite, unabhaengige (und potenziell abweichende) Kopie existiert.
+    real_points = [{"problem": "P1", "uebung_id": "a"}, {"problem": "P2", "uebung_id": "b"}]
+    fake = _FakeCloudflareClient(
+        tool_calls=[{"name": "return_feedback_points", "arguments": {"points": [{"points": real_points}]}}]
+    )
+    points = cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a", "b"])
+    assert points == real_points
+
+
+def test_cloudflare_request_feedback_points_raises_when_no_tool_calls_present():
+    fake = _FakeCloudflareClient(tool_calls=[])
+    with pytest.raises(RuntimeError):
+        cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"])
+
+
+def test_cloudflare_request_feedback_points_passes_catalog_ids_as_enum_in_tool_schema():
+    fake = _FakeCloudflareClient(tool_calls=[{"name": "return_feedback_points", "arguments": {"points": []}}])
+    cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a", "b"])
+    schema = fake.last_kwargs["tools"][0]["function"]["parameters"]
+    assert schema["properties"]["points"]["items"]["properties"]["uebung_id"]["enum"] == ["a", "b"]
+
+
+def test_cloudflare_workers_ai_client_posts_to_correct_url_with_bearer_token(monkeypatch):
+    captured = {}
+
+    class _FakeHttpxClient:
+        def post(self, url, headers=None, json=None, **kwargs):
+            captured["url"] = url
+            captured["headers"] = headers
+            captured["json"] = json
+
+            class _Resp:
+                def raise_for_status(self):
+                    pass
+
+                def json(self):
+                    return {"result": {"tool_calls": []}, "success": True, "errors": [], "messages": []}
+
+            return _Resp()
+
+    client = CloudflareWorkersAIClient(
+        account_id="acct123", api_token="tok456", http_client=_FakeHttpxClient()
+    )
+    client.create(model="@cf/qwen/qwen3-30b-a3b-fp8", messages=[{"role": "user", "content": "hi"}], tools=[])
+
+    assert captured["url"] == "https://api.cloudflare.com/client/v4/accounts/acct123/ai/run/@cf/qwen/qwen3-30b-a3b-fp8"
+    assert captured["headers"]["Authorization"] == "Bearer tok456"
+    assert captured["json"]["messages"] == [{"role": "user", "content": "hi"}]
+
+
 def test_request_feedback_points_passes_catalog_ids_as_enum_in_tool_schema():
     fake = _FakeMessagesClient(points=[])
     request_feedback_points(fake, "claude-sonnet-5", "prompt", ["a", "b"])

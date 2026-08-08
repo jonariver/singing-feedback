@@ -12,6 +12,10 @@ load_dotenv(PROJECT_ROOT / ".env")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
+CLOUDFLARE_ACCOUNT_ID = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+CLOUDFLARE_API_TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+CLOUDFLARE_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+
 # Komma-getrennte Liste erlaubter Origins fuers CORS, z.B. wenn das Backend
 # gehostet und von einer Mobile-App oder einem separat gehosteten Frontend
 # aus angesprochen wird. Leer = keine Cross-Origin-Requests erlaubt (Default,
