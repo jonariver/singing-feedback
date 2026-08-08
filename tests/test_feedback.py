@@ -302,6 +302,24 @@ def test_cloudflare_request_feedback_points_extracts_points_from_tool_call():
     assert points == [{"problem": "P", "uebung_id": "a"}]
 
 
+def test_cloudflare_request_feedback_points_extracts_points_from_nested_openai_shape():
+    # OpenAI-kompatibles verschachteltes Format: {"type": "function", "function":
+    # {"name": ..., "arguments": ...}} - OHNE top-level "name"/"arguments". Das ist
+    # die vom approved design spec vorhergesagte Primaerform; der flache Fallback
+    # darf diesen tool_call nicht faelschlich uebergehen.
+    fake = _FakeCloudflareClient(
+        tool_calls=[{
+            "type": "function",
+            "function": {
+                "name": "return_feedback_points",
+                "arguments": {"points": [{"problem": "P", "uebung_id": "a"}]},
+            },
+        }]
+    )
+    points = cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"])
+    assert points == [{"problem": "P", "uebung_id": "a"}]
+
+
 def test_cloudflare_request_feedback_points_parses_stringified_arguments():
     # Workers AI's "arguments" ist laut Dokumentation vom Typ "unknown" - manche
     # Modelle liefern es als JSON-String statt als bereits geparstes Objekt.
@@ -315,6 +333,16 @@ def test_cloudflare_request_feedback_points_parses_stringified_arguments():
     )
     points = cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"])
     assert points == [{"problem": "P", "uebung_id": "a"}]
+
+
+def test_cloudflare_request_feedback_points_raises_runtime_error_on_invalid_json_arguments():
+    # arguments als String, der kein valides JSON ist - muss als RuntimeError
+    # durchgereicht werden, nicht als unbehandelter json.JSONDecodeError.
+    fake = _FakeCloudflareClient(
+        tool_calls=[{"name": "return_feedback_points", "arguments": "not valid json {"}]
+    )
+    with pytest.raises(RuntimeError):
+        cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"])
 
 
 def test_cloudflare_request_feedback_points_reuses_normalize_points_for_malformed_shapes():
@@ -363,11 +391,19 @@ def test_cloudflare_workers_ai_client_posts_to_correct_url_with_bearer_token(mon
     client = CloudflareWorkersAIClient(
         account_id="acct123", api_token="tok456", http_client=_FakeHttpxClient()
     )
-    client.create(model="@cf/qwen/qwen3-30b-a3b-fp8", messages=[{"role": "user", "content": "hi"}], tools=[])
+    tools = [{"type": "function", "function": {"name": "return_feedback_points"}}]
+    client.create(
+        model="@cf/qwen/qwen3-30b-a3b-fp8",
+        messages=[{"role": "user", "content": "hi"}],
+        tools=tools,
+        max_tokens=1024,
+    )
 
     assert captured["url"] == "https://api.cloudflare.com/client/v4/accounts/acct123/ai/run/@cf/qwen/qwen3-30b-a3b-fp8"
     assert captured["headers"]["Authorization"] == "Bearer tok456"
     assert captured["json"]["messages"] == [{"role": "user", "content": "hi"}]
+    assert captured["json"]["tools"] == tools
+    assert captured["json"]["max_tokens"] == 1024
 
 
 def test_request_feedback_points_passes_catalog_ids_as_enum_in_tool_schema():

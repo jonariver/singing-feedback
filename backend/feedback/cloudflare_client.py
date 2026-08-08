@@ -39,12 +39,14 @@ class CloudflareWorkersAIClient:
         self._api_token = api_token
         self._http_client = http_client or httpx.Client(timeout=30.0)
 
-    def create(self, *, model: str, messages: list[dict], tools: list[dict]) -> dict:
+    def create(
+        self, *, model: str, messages: list[dict], tools: list[dict], max_tokens: int,
+    ) -> dict:
         url = f"https://api.cloudflare.com/client/v4/accounts/{self._account_id}/ai/run/{model}"
         response = self._http_client.post(
             url,
             headers={"Authorization": f"Bearer {self._api_token}"},
-            json={"messages": messages, "tools": tools},
+            json={"messages": messages, "tools": tools, "max_tokens": max_tokens},
         )
         response.raise_for_status()
         return response.json()
@@ -93,21 +95,28 @@ def request_feedback_points(
     enthaelt."""
     response = client.create(
         model=model,
+        max_tokens=1024,
         messages=[{"role": "user", "content": prompt_text}],
         tools=[_tool_schema_openai(catalog_ids)],
     )
     tool_calls = response.get("result", {}).get("tool_calls") or []
     for call in tool_calls:
-        if call.get("name") != _TOOL_NAME:
+        # Cloudflare/Workers AI kann tool_calls in zwei Formen liefern: flach
+        # ({"name": ..., "arguments": ...}, laut Cloudflares eigenen
+        # Beispielen) oder im OpenAI-kompatiblen verschachtelten Format
+        # ({"type": "function", "function": {"name": ..., "arguments": ...}},
+        # ohne top-level "name"/"arguments"). name/arguments muessen aus BEIDEN
+        # Formen aufgeloest werden, bevor der Namensabgleich passiert - sonst
+        # wird ein verschachtelter tool_call faelschlich uebersprungen, weil
+        # call.get("name") dafuer None ist.
+        fn = call.get("function") if isinstance(call.get("function"), dict) else {}
+        name = call.get("name") or fn.get("name")
+        if name != _TOOL_NAME:
             continue
-        arguments = call.get("arguments", {})
+        arguments = fn.get("arguments", call.get("arguments", {}))
         # Cloudflares eigene Dokumentation deklariert "arguments" als Typ
         # "unknown" - je nach Modell kann es ein bereits geparstes Objekt oder
-        # ein JSON-kodierter String sein. Ein verschachteltes "function"-Feld
-        # (OpenAI-Kompatibilitaetsformat) wird ebenfalls defensiv abgefangen,
-        # falls Cloudflare das Antwortformat je angleicht.
-        if "function" in call and "arguments" in call["function"]:
-            arguments = call["function"]["arguments"]
+        # ein JSON-kodierter String sein.
         if isinstance(arguments, str):
             try:
                 arguments = json.loads(arguments)
