@@ -45,8 +45,10 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             ExpansionTile(
+              key: const PageStorageKey<String>('abschnitt1'),
               title: Text('1. Zielmelodie', style: Theme.of(context).textTheme.titleMedium),
               initiallyExpanded: true,
+              expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
                 if (session.referenceSource == ReferenceSource.midi) ...[
@@ -98,8 +100,10 @@ class HomeScreen extends StatelessWidget {
             ),
             const Divider(height: 32),
             ExpansionTile(
+              key: const PageStorageKey<String>('abschnitt2'),
               title: Text('2. Gesangsaufnahme', style: Theme.of(context).textTheme.titleMedium),
               initiallyExpanded: true,
+              expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
                 RecordingControl(
@@ -132,8 +136,10 @@ class HomeScreen extends StatelessWidget {
             ),
             const Divider(height: 32),
             ExpansionTile(
+              key: const PageStorageKey<String>('abschnitt3'),
               title: Text('3. Tonhöhen-Vergleich', style: Theme.of(context).textTheme.titleMedium),
               initiallyExpanded: true,
+              expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
                 StatusBanner(status: session.alignStatus, message: session.alignMessage),
@@ -156,8 +162,10 @@ class HomeScreen extends StatelessWidget {
             ),
             const Divider(height: 32),
             ExpansionTile(
+              key: const PageStorageKey<String>('abschnitt4'),
               title: Text('4. Bewertung', style: Theme.of(context).textTheme.titleMedium),
               initiallyExpanded: true,
+              expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
                 StatusBanner(status: session.scoreStatus, message: session.scoreMessage),
@@ -170,8 +178,10 @@ class HomeScreen extends StatelessWidget {
             ),
             const Divider(height: 32),
             ExpansionTile(
+              key: const PageStorageKey<String>('abschnitt5'),
               title: Text('5. Feedback', style: Theme.of(context).textTheme.titleMedium),
               initiallyExpanded: true,
+              expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
                 FeedbackProviderControl(

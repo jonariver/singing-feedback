@@ -88,4 +88,33 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(PitchChart), findsOneWidget);
   });
+
+  testWidgets(
+      'Abschnitt 3 bleibt zusammengeklappt, wenn er aus dem Viewport scrollt und zurueck',
+      (tester) async {
+    // Dies testet die PageStorageKey-Reparatur: ohne PageStorageKey wuerde
+    // ein zusammengeklappter Abschnitt beim Scrollen aus dem Viewport und
+    // zurueck stumm wieder aufklappen, weil der dispose/reconstruct den
+    // initiallyExpanded: true Zustand reaktiviert.
+    await tester.pumpWidget(_wrap(_buildSession()));
+    final scrollable = find.byType(Scrollable).first;
+
+    // Abschnitt 3 einklappen
+    expect(find.byType(PitchChart), findsOneWidget);
+    await tester.tap(find.text('3. Tonhöhen-Vergleich'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PitchChart), findsNothing);
+
+    // Zum Ende scrollen, um Abschnitt 3 weit aus dem Viewport zu scrollen
+    await tester.scrollUntilVisible(find.text('5. Feedback'), 200, scrollable: scrollable);
+    await tester.pumpAndSettle();
+
+    // Zurueck zu Abschnitt 3 scrollen
+    await tester.scrollUntilVisible(find.text('3. Tonhöhen-Vergleich'), -200,
+        scrollable: scrollable);
+    await tester.pumpAndSettle();
+
+    // PitchChart sollte immer noch unsichtbar sein (Abschnitt 3 bleibt eingeklappt)
+    expect(find.byType(PitchChart), findsNothing);
+  });
 }
