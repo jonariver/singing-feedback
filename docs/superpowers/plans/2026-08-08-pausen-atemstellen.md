@@ -58,8 +58,12 @@ per-note JSON/summary/`problem_tags` shape. A brand-new catalog entry
 **Interfaces:**
 - Consumes: `is_held_note(note: dict) -> bool` from `backend.scoring.stability` (already
   exists, unchanged).
-- Produces: `compute_pause(note: dict, attributed_frames: list[dict]) -> dict` with shape
-  `{"applicable": bool, "gap_seconds": float | None, "flag": bool}`. Also exports
+- Produces: `compute_pause(note: dict, attributed_frames: list[dict], frame_rate_hz: float = 100.0) -> dict`
+  with shape `{"applicable": bool, "gap_seconds": float | None, "flag": bool}` (`frame_rate_hz`
+  added in Task 1's fix round so `gap_seconds` can add one frame step to the raw
+  last-minus-first-timestamp span, matching the approved design spec's stated formula
+  and `notes.py::segment_target_notes`'s existing `end_t = last_frame_t + step`
+  convention). Also exports
   `NOT_APPLICABLE_PAUSE = {"applicable": False, "gap_seconds": None, "flag": False}`
   (module-level constant, same public-sentinel pattern as `glides.py`'s
   `NOT_APPLICABLE_GLIDE`) for Task 2 to reuse as the gated-off default.
@@ -267,8 +271,9 @@ git commit -m "feat: add pause detection (compute_pause) for gaps inside held no
 - Test: `tests/test_scoring.py`
 
 **Interfaces:**
-- Consumes: `compute_pause(note, attributed_frames) -> dict` and `NOT_APPLICABLE_PAUSE`
-  from Task 1 (`backend.scoring.pauses`).
+- Consumes: `compute_pause(note, attributed_frames, frame_rate_hz) -> dict` and
+  `NOT_APPLICABLE_PAUSE` from Task 1 (`backend.scoring.pauses`) — `frame_rate_hz` is
+  already a local variable in `score_performance()`, pass it through positionally.
 - Produces: `score_performance()`'s per-note dict gains a `"pause"` key (same shape as
   `compute_pause`'s return value); `summary` gains `"pause_flagged_count": int`;
   `problem_tags` may contain `"unerwartete_pause_in_gehaltener_note"`.
@@ -364,7 +369,7 @@ Right after the existing `glide = (...)` block (the multi-line assignment ending
 `else dict(NOT_APPLICABLE_GLIDE)`), add:
 
 ```python
-        pause = compute_pause(note, attributed) if not missed else dict(NOT_APPLICABLE_PAUSE)
+        pause = compute_pause(note, attributed, frame_rate_hz) if not missed else dict(NOT_APPLICABLE_PAUSE)
 ```
 
 Right after the existing `if glide["flag"]: problem_tags.add(_PROBLEM_TAG_GLIDE);
