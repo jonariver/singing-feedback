@@ -8,7 +8,7 @@ import pytest
 
 from backend.feedback.catalog import catalog_ids, load_catalog, lookup
 from backend.feedback.client import request_feedback_points
-from backend.feedback.generate import FeedbackUnavailableError, generate_feedback
+from backend.feedback.generate import _CATEGORY_MATCHERS, FeedbackUnavailableError, generate_feedback
 from backend.feedback.prompt import build_prompt_context, build_prompt_text
 
 
@@ -39,6 +39,13 @@ def test_lookup_returns_none_for_unknown_id():
     assert lookup(catalog, "nonexistent") is None
 
 
+def test_category_matchers_cover_exactly_the_real_catalog_ids():
+    # Verhindert, dass ein Tippfehler in _CATEGORY_MATCHERS oder im Katalog still
+    # _find_jump_to_t fuer eine Kategorie (z.B. Pause) auf None zurueckfallen laesst,
+    # ohne dass ein Test das bemerkt.
+    assert set(_CATEGORY_MATCHERS) == set(catalog_ids(load_catalog()))
+
+
 def _note(
     index: int,
     missed: bool = False,
@@ -52,6 +59,7 @@ def _note(
     glide_flag: bool = False,
     glide_direction: str | None = None,
     pause_flag: bool = False,
+    pause_gap_seconds: float = 0.0,
     sung_t: float | None = None,
 ) -> dict:
     return {
@@ -78,7 +86,7 @@ def _note(
             "flag": glide_flag,
             "direction": glide_direction,
         },
-        "pause": {"applicable": True, "gap_seconds": 0.0, "flag": pause_flag},
+        "pause": {"applicable": True, "gap_seconds": pause_gap_seconds, "flag": pause_flag},
         "sung_t": sung_t,
     }
 
@@ -144,11 +152,11 @@ def test_build_prompt_text_mentions_glide():
 
 
 def test_build_prompt_text_mentions_pause():
-    notes = [_note(0, pause_flag=True)]
+    notes = [_note(0, pause_flag=True, pause_gap_seconds=0.34)]
     context = build_prompt_context(_score_result(notes))
     text = build_prompt_text(context)
     assert "Pause mitten in gehaltener Note: 1 Noten" in text
-    assert "Pause mitten in der Note" in text
+    assert "Pause mitten in der Note (0.34s)" in text
 
 
 def test_build_prompt_text_says_keine_when_no_flagged_notes():

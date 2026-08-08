@@ -92,6 +92,7 @@ def test_scoring_matches_fixture_expectations():
     # diese Note von der Glide-Pruefung aus.
     assert notes[2]["glide"]["applicable"] is False
     assert summary["glide_flagged_count"] == 0
+    assert summary["pause_flagged_count"] == 0
 
     # Stimmumfang der ganzen Aufnahme (Melodie C4-E4-G4-E4-C4, also MIDI 60-67):
     # tatsaechlich beobachtete Werte aus echter pYIN-Erkennung auf der Fixture

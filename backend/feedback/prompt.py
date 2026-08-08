@@ -62,6 +62,7 @@ def build_prompt_context(score_result: dict) -> dict:
                 "glide_flag": note["glide"]["flag"],
                 "glide_direction": note["glide"]["direction"],
                 "pause_flag": note["pause"]["flag"],
+                "pause_gap_seconds": note["pause"]["gap_seconds"],
                 "sung_t": note["sung_t"],
             })
     return {"summary": summary, "flagged_notes": _sample_evenly(flagged_notes, _MAX_FLAGGED_NOTES_IN_PROMPT)}
@@ -108,7 +109,7 @@ def build_prompt_text(context: dict) -> str:
             if note["glide_flag"]:
                 parts.append(f"rutscht rein ({note['glide_direction']})")
             if note["pause_flag"]:
-                parts.append("Pause mitten in der Note")
+                parts.append(f"Pause mitten in der Note ({note['pause_gap_seconds']:.2f}s)")
             lines.append("- " + " ".join(parts))
     else:
         lines.append("- keine")

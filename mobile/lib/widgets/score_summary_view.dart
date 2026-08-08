@@ -48,7 +48,10 @@ class ScoreSummaryView extends StatelessWidget {
       parts.add('gerutscht ($direction)');
     }
     if (note.pauseFlag) {
-      parts.add('Pause mitten in der Note (${note.pauseGapSeconds!.toStringAsFixed(2)}s)');
+      final gapSeconds = note.pauseGapSeconds;
+      parts.add(gapSeconds == null
+          ? 'Pause mitten in der Note'
+          : 'Pause mitten in der Note (${gapSeconds.toStringAsFixed(2)}s)');
     }
     if (note.stabilityFlag) parts.add('instabil');
     if (note.missed) parts.add('verfehlt');

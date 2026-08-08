@@ -145,6 +145,20 @@ Glide-Implementierung nicht relevant ist.
   konstruierte Frame-Dicts getestet (gleiches Muster wie die bestehenden
   Stabilitäts-/Drift-/Glide-Tests in `tests/test_scoring.py`).
 
+### Bekannte Einschraenkung (aus dem finalen Whole-Branch-Review, nicht blockierend)
+
+`notes.py`s `segment_target_notes()` ueberbrueckt kurze unstimmhafte Luecken in der
+Zielkurve (bis zu `NOTE_SEGMENT_MAX_BRIDGE_GAP_FRAMES`, aktuell 150ms bei 100Hz) zu einer
+einzigen Note - eine echte kurze Pause in der Zielmelodie kann so innerhalb einer von
+`compute_pause()` als durchgehend gehaltenen Note landen. Da `PAUSE_MIN_GAP_SECONDS`=0,25s
+nur 100ms ueber dieser Bruecken-Schwelle liegt, hat ein Saenger, der an genau so einer
+legitimen kurzen Zielpause atmet, nur ~100ms Puffer, bevor er faelschlich als
+"unerwartete Pause" geflaggt wird. Wird hier bewusst nicht behoben (dafuer muesste
+`compute_pause()` Zielkurven-Stimmhaftigkeit kennen - eine Schnittstellenaenderung, die
+auch `score.py`s Aufrufstelle betrifft); falls `PAUSE_MIN_GAP_SECONDS` jemals nach unten
+kalibriert wird, muss es deutlich ueber `NOTE_SEGMENT_MAX_BRIDGE_GAP_FRAMES /
+frame_rate_hz` bleiben, sonst verschaerft sich diese Klasse von Fehlalarmen.
+
 ## Out of Scope (bewusst nicht Teil dieser Spec)
 
 - Fehlende Atempausen an Zielstellen: die Zielmelodie hat eine Pause zwischen zwei
