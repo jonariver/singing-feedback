@@ -169,15 +169,16 @@ class SessionState extends ChangeNotifier {
 
   Future<void> play(Uint8List bytes) async {
     final generation = _playbackGeneration = Object();
-    // Nur bei einem echten Trackwechsel (andere Bytes-Identitaet) zuruecksetzen -
-    // sonst wuerde z.B. ein Re-Play derselben Bytes (oder ein playFrom()-Seek
-    // innerhalb derselben Spur) hier faelschlich kurz die Dauer/Position auf 0
-    // reissen, obwohl dieselbe Spur weiterlaeuft (Regression: Seekbar blitzte auf
-    // 0:00 und wurde kurz disabled bei jedem Tap-to-Seek).
-    if (!identical(_playingBytes, bytes)) {
-      _lastKnownPosition = Duration.zero;
-      _lastKnownDuration = Duration.zero;
-    }
+    // play() startet die zugrundeliegende Wiedergabe IMMER bei Position 0 neu -
+    // unabhaengig davon, ob dieselben Bytes wie zuvor uebergeben werden (z.B.
+    // "Erneut abspielen" nach pause() in playback_button.dart, das dieselbe
+    // Uint8List-Referenz erneut uebergibt). Deshalb hier bewusst KEIN
+    // identical()-Guard (anders als playFrom() unten) - immer unbedingt
+    // zuruecksetzen, sonst wuerden bei einem Replay derselben Bytes kurzzeitig
+    // die alten (z.B. 45s/60s) Positions-/Dauerwerte weiterangezeigt, bis der
+    // naechste echte Stream-Tick eintrifft.
+    _lastKnownPosition = Duration.zero;
+    _lastKnownDuration = Duration.zero;
     _playingBytes = bytes;
     await _playbackController.play(bytes);
     if (generation != _playbackGeneration) return;
@@ -187,8 +188,13 @@ class SessionState extends ChangeNotifier {
 
   Future<void> playFrom(Uint8List bytes, Duration position) async {
     final generation = _playbackGeneration = Object();
-    // Siehe Kommentar in play() oben - gleiches Prinzip: nur bei echtem
-    // Trackwechsel zuruecksetzen, nicht bei einem Seek innerhalb derselben Spur.
+    // Anders als play() oben: playFrom() ist der eigentliche Seek-Einstiegspunkt.
+    // Nur bei einem echten Trackwechsel (andere Bytes-Identitaet) zuruecksetzen -
+    // sonst wuerde ein Seek innerhalb derselben Spur hier faelschlich kurz die
+    // Dauer/Position auf 0 reissen, obwohl dieselbe Spur weiterlaeuft (Regression:
+    // Seekbar blitzte auf 0:00 und wurde kurz disabled bei jedem Tap-to-Seek).
+    // Ein echter Bytes-Wechsel (z.B. "Sprung zu dieser Position" aus der
+    // Feedback-Karte auf eine andere Spur) soll dagegen weiterhin zuruecksetzen.
     if (!identical(_playingBytes, bytes)) {
       _lastKnownPosition = Duration.zero;
       _lastKnownDuration = Duration.zero;

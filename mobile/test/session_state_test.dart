@@ -869,6 +869,42 @@ void main() {
     });
 
     test(
+        'play() mit denselben Bytes nach pause() (Erneut-abspielen) setzt '
+        'positionFor/durationFor synchron auf Duration.zero zurueck (Regression: die vorige '
+        'Fix-Runde uebernahm den identical()-Guard aus playFrom() faelschlich auch in play(), '
+        'wodurch "Erneut abspielen" - PlaybackButton ruft play() erneut mit derselben, seit '
+        'pause() unveraenderten Uint8List-Referenz auf - kurzzeitig noch die alte Position/'
+        'Dauer zeigte, obwohl der echte Player play() immer bei Position 0 neu startet)',
+        () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await session.play(bytes);
+      fake._positionChangedController.add(const Duration(seconds: 45));
+      fake._durationChangedController.add(const Duration(seconds: 60));
+      await Future<void>.delayed(Duration.zero);
+      expect(session.positionFor(bytes), const Duration(seconds: 45));
+      expect(session.durationFor(bytes), const Duration(seconds: 60));
+
+      await session.pause();
+      // pause() loescht _playingBytes NICHT (nur stop() tut das) - der erneute
+      // play()-Aufruf unten uebergibt bewusst dieselbe Uint8List-Instanz, genau wie
+      // playback_button.dart._togglePlayback() es beim "Erneut abspielen" tut.
+
+      // play() haengt fest (Completer offen) - der Reset muss trotzdem schon VOR
+      // dem Abschluss des await sichtbar sein, gleiches Timing wie bei den Tests oben.
+      fake.playCompleter = Completer<void>();
+      final replayCall = session.play(bytes);
+
+      expect(session.positionFor(bytes), Duration.zero);
+      expect(session.durationFor(bytes), Duration.zero);
+
+      fake.playCompleter!.complete();
+      await replayCall;
+    });
+
+    test(
         'Bloßes Erzeugen einer SessionState und Abonnieren von onPositionChanged baut den '
         'lazy Player nicht (Regressionsschutz fuer die Lazy-Invariante)', () {
       var buildCount = 0;
