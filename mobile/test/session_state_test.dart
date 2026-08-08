@@ -762,6 +762,31 @@ void main() {
 
       expect(session.positionFor(otherBytes), Duration.zero);
       expect(session.durationFor(otherBytes), Duration.zero);
+    });
+
+    test(
+        'positionFor/durationFor liefern Duration.zero fuer null-Bytes, auch nachdem stop() '
+        '_playingBytes auf null gesetzt hat, waehrend intern noch ein von Null verschiedener '
+        'alter Tick steht (Regression: identical(null, null) ist in Dart true - eine '
+        'ungeschuetzte identical()-Pruefung ohne bytes != null-Guard wuerde hier '
+        'faelschlich den alten Tick statt Duration.zero zurueckgeben)', () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await session.play(bytes);
+      fake._positionChangedController.add(const Duration(seconds: 2));
+      fake._durationChangedController.add(const Duration(seconds: 10));
+      // Stream-Events laufen als Microtask - kurz nachgeben, bevor gelesen wird.
+      await Future<void>.delayed(Duration.zero);
+      expect(session.positionFor(bytes), const Duration(seconds: 2));
+      expect(session.durationFor(bytes), const Duration(seconds: 10));
+
+      // stop() setzt _playingBytes auf null, laesst _lastKnownPosition/_lastKnownDuration
+      // aber unangetastet (siehe stop()-Kommentar) - genau die Konstellation, in der
+      // identical(null, null) ohne Guard faelschlich true ergeben wuerde.
+      await session.stop();
+
       expect(session.positionFor(null), Duration.zero);
       expect(session.durationFor(null), Duration.zero);
     });

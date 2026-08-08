@@ -162,10 +162,10 @@ class SessionState extends ChangeNotifier {
   /// Gesangsaufnahme) trotz gemeinsamem Player nur fuer die tatsaechlich laufende
   /// Spur eine Position an.
   Duration positionFor(Uint8List? bytes) =>
-      identical(_playingBytes, bytes) ? _lastKnownPosition : Duration.zero;
+      bytes != null && identical(_playingBytes, bytes) ? _lastKnownPosition : Duration.zero;
 
   Duration durationFor(Uint8List? bytes) =>
-      identical(_playingBytes, bytes) ? _lastKnownDuration : Duration.zero;
+      bytes != null && identical(_playingBytes, bytes) ? _lastKnownDuration : Duration.zero;
 
   Future<void> play(Uint8List bytes) async {
     final generation = _playbackGeneration = Object();
