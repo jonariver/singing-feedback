@@ -363,6 +363,27 @@ def test_cloudflare_request_feedback_points_raises_when_no_tool_calls_present():
         cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"])
 
 
+def test_cloudflare_request_feedback_points_raises_runtime_error_on_error_envelope():
+    # Cloudflares v4-Standard-Fehlerhuelle: "result" ist vorhanden, aber None, und
+    # "success" ist False. response.get("result", {}) liefert in diesem Fall None
+    # (der {}-Default greift nur, wenn der Schluessel FEHLT) - ein direktes
+    # .get("tool_calls") darauf wuerfe vor dem Fix einen unbehandelten
+    # AttributeError statt eines RuntimeError mit Cloudflares eigenem Fehlertext.
+    class _FakeErrorEnvelopeClient:
+        def create(self, **kwargs):
+            return {
+                "result": None,
+                "success": False,
+                "errors": [{"code": 1000, "message": "test error"}],
+                "messages": [],
+            }
+
+    with pytest.raises(RuntimeError, match="test error"):
+        cloudflare_request_feedback_points(
+            _FakeErrorEnvelopeClient(), "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a"]
+        )
+
+
 def test_cloudflare_request_feedback_points_passes_catalog_ids_as_enum_in_tool_schema():
     fake = _FakeCloudflareClient(tool_calls=[{"name": "return_feedback_points", "arguments": {"points": []}}])
     cloudflare_request_feedback_points(fake, "@cf/qwen/qwen3-30b-a3b-fp8", "prompt", ["a", "b"])
@@ -584,6 +605,31 @@ def test_generate_feedback_uses_cloudflare_when_provider_is_cloudflare(monkeypat
     )
     assert result["points"][0]["problem"] == "Timing daneben"
     assert fake.last_kwargs["model"] == "@cf/qwen/qwen3-30b-a3b-fp8"
+    # Beweist, dass der geteilte Katalog-Anreicherungs-/jump_to_t-Aufloesungscode
+    # (generate.py::_find_jump_to_t / catalog.lookup) auch fuer von Cloudflare
+    # stammende Daten End-to-End tatsaechlich funktioniert - nicht nur, dass ein
+    # "problem"-String durchgereicht wird. Die fixture-Note oben hat bewusst
+    # sung_t=1.0 fuer genau diese Pruefung.
+    assert result["points"][0]["jump_to_t"] == 1.0
+    assert isinstance(result["points"][0]["technik"], str) and result["points"][0]["technik"]
+
+
+def test_generate_feedback_raises_when_cloudflare_returns_empty_points(monkeypatch):
+    # Wenn die Live-Response-Form von request_feedback_points_cloudflare nicht erkannt
+    # wird, faellt arguments.get("points", []) still auf [] zurueck - _normalize_points([])
+    # liefert unveraendert []. Da problem_tags hier nicht leer ist, GIBT es etwas zu
+    # berichten - eine leere raw_points-Liste ist also fast sicher ein Integrations-
+    # Fehler, kein legitimes "keine Probleme gefunden". generate_feedback() muss das als
+    # FeedbackUnavailableError melden statt als sauberes {"points": []} durchzureichen
+    # (was der Mobile-Client als "Keine besonderen Probleme erkannt." anzeigen wuerde).
+    monkeypatch.setattr("backend.feedback.generate.CLOUDFLARE_ACCOUNT_ID", "acct123")
+    monkeypatch.setattr("backend.feedback.generate.CLOUDFLARE_API_TOKEN", "tok456")
+    notes = [_note(0, timing_classification="too_late", timing_deviation_ms=250.0)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["timingprobleme"]
+    fake = _FakeCloudflareClient(tool_calls=[{"name": "return_feedback_points", "arguments": {"points": []}}])
+    with pytest.raises(FeedbackUnavailableError):
+        generate_feedback(score_result, provider="cloudflare", cloudflare_client_factory=lambda: fake)
 
 
 def test_generate_feedback_raises_when_cloudflare_credentials_missing(monkeypatch):

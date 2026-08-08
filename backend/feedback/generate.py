@@ -4,6 +4,7 @@ aufrufen, Antwort gegen den Katalog validieren/anreichern."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 import anthropic
@@ -15,6 +16,8 @@ from backend.feedback.client import request_feedback_points
 from backend.feedback.cloudflare_client import CloudflareWorkersAIClient
 from backend.feedback.cloudflare_client import request_feedback_points as request_feedback_points_cloudflare
 from backend.feedback.prompt import build_prompt_context, build_prompt_text
+
+logger = logging.getLogger(__name__)
 
 
 class FeedbackUnavailableError(Exception):
@@ -140,7 +143,19 @@ def generate_feedback(
             raw_points = request_feedback_points_cloudflare(
                 cloudflare_client_factory(), CLOUDFLARE_MODEL, prompt_text, catalog_ids(catalog)
             )
+        # An dieser Stelle ist problem_tags garantiert nicht leer (frueher Return oben),
+        # d.h. es GIBT etwas zu berichten. Eine leere raw_points-Liste ist deshalb so gut
+        # wie nie eine legitime "keine Probleme gefunden"-Antwort, sondern fast immer ein
+        # Integrations-Fehler (z.B. eine Response-Form, die request_feedback_points nicht
+        # erkennt und stillschweigend auf [] zurueckfaellt) - siehe die Diskussion im
+        # finalen Review. Ohne diese Pruefung wuerde generate_feedback() unten einfach
+        # {"points": []} zurueckgeben und der Nutzer bekaeme faelschlich "keine
+        # besonderen Probleme erkannt" angezeigt, obwohl der Provider-Aufruf eigentlich
+        # fehlgeschlagen ist.
+        if not raw_points:
+            raise RuntimeError("Provider lieferte keine Feedback-Punkte zurueck.")
     except Exception as exc:
+        logger.exception("Feedback-Generierung fehlgeschlagen (provider=%s)", provider)
         raise FeedbackUnavailableError(_UNAVAILABLE_MESSAGE) from exc
 
     used_notes: set[int] = set()

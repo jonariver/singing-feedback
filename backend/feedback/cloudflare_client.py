@@ -4,7 +4,21 @@ uebung_id ist im Tool-Schema als Enum auf die tatsaechlichen Katalog-IDs
 beschraenkt. Nutzt _normalize_points() aus client.py wieder, statt sie zu
 duplizieren - ein kleineres Modell wie Qwen3-30B-A3B haelt sich vermutlich noch
 weniger zuverlaessig ans Schema als Claude (siehe die dort dokumentierten,
-live beobachteten Fehlformen)."""
+live beobachteten Fehlformen).
+
+ACHTUNG - UNVERIFIZIERTE LIVE-FORM: Zum Zeitpunkt dieser Implementierung
+existieren in dieser Umgebung weder CLOUDFLARE_ACCOUNT_ID noch
+CLOUDFLARE_API_TOKEN - es wurde also noch KEIN einziger echter Aufruf gegen
+Workers AI gemacht. Die beiden in request_feedback_points() unten behandelten
+tool_calls-Formen (flach vs. OpenAI-kompatibel verschachtelt) sind beide aus
+Cloudflares Dokumentation und defensivem Coding abgeleitet, nicht aus einer
+tatsaechlich beobachteten Antwort (im Gegensatz zu den bei Anthropic
+dokumentierten Fehlformen, die live beobachtet wurden - client.py::
+_normalize_points()). Es ist moeglich, dass die echte Form von beiden
+Annahmen abweicht. Wer als erstes echte Zugangsdaten setzt und einen echten
+Aufruf macht: bitte das rohe Antwort-JSON gegen die Annahmen in diesem Modul
+(hier und in request_feedback_points()) pruefen, bevor dieser Pfad in
+Produktion vertraut wird."""
 
 from __future__ import annotations
 
@@ -99,14 +113,32 @@ def request_feedback_points(
         messages=[{"role": "user", "content": prompt_text}],
         tools=[_tool_schema_openai(catalog_ids)],
     )
+    # Cloudflares v4-Standard-Fehlerhuelle bei einem fehlgeschlagenen Aufruf sieht so
+    # aus: {"result": None, "success": False, "errors": [{"code": ..., "message": ...}]}.
+    # Der Schluessel "result" ist dabei VORHANDEN (nur eben None) - response.get(
+    # "result", {}) liefert in diesem Fall also None statt des {}-Defaults (der Default
+    # greift nur, wenn der Schluessel fehlt), und ein direktes .get("tool_calls") darauf
+    # wuerfe einen unkontrollierten AttributeError statt eines RuntimeError. Diese
+    # Pruefung faengt den Fehlerfall vorher ab und reicht Cloudflares eigenen
+    # Fehlertext weiter - der bei einem ersten echten Live-Aufruf der mit Abstand
+    # nuetzlichste Diagnosewert ist.
+    if not response.get("success", True) or response.get("result") is None:
+        errors = response.get("errors") or []
+        error_text = (
+            "; ".join(str(e.get("message", e)) for e in errors) if errors else "unbekannter Fehler"
+        )
+        raise RuntimeError(f"Cloudflare-Antwort meldete einen Fehler: {error_text}")
     tool_calls = response.get("result", {}).get("tool_calls") or []
     for call in tool_calls:
-        # Cloudflare/Workers AI kann tool_calls in zwei Formen liefern: flach
-        # ({"name": ..., "arguments": ...}, laut Cloudflares eigenen
+        # Cloudflare/Workers AI kann tool_calls Berichten/Doku zufolge in zwei Formen
+        # liefern: flach ({"name": ..., "arguments": ...}, laut Cloudflares eigenen
         # Beispielen) oder im OpenAI-kompatiblen verschachtelten Format
         # ({"type": "function", "function": {"name": ..., "arguments": ...}},
-        # ohne top-level "name"/"arguments"). name/arguments muessen aus BEIDEN
-        # Formen aufgeloest werden, bevor der Namensabgleich passiert - sonst
+        # ohne top-level "name"/"arguments"). WICHTIG: keine dieser beiden Formen wurde
+        # bisher gegen eine echte Live-Antwort verifiziert (siehe Modul-Docstring oben)
+        # - beide werden vorsorglich unterstuetzt, falls die tatsaechliche Form von der
+        # einen oder anderen Doku-Annahme abweicht. name/arguments muessen aus
+        # BEIDEN Formen aufgeloest werden, bevor der Namensabgleich passiert - sonst
         # wird ein verschachtelter tool_call faelschlich uebersprungen, weil
         # call.get("name") dafuer None ist.
         fn = call.get("function") if isinstance(call.get("function"), dict) else {}
