@@ -836,6 +836,39 @@ void main() {
     });
 
     test(
+        'playFrom() mit denselben Bytes (Seek innerhalb derselben Spur) setzt '
+        'positionFor/durationFor NICHT synchron auf Duration.zero zurueck (Regression: '
+        'die Seekbar blitzte bei jedem Tap-to-Seek kurz auf 0:00 und wurde disabled, weil '
+        'play()/playFrom() den Reset bisher unbedingt ausloesten, auch bei einem reinen '
+        'Seek innerhalb derselben, bereits laufenden Spur statt eines echten Trackwechsels)',
+        () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await session.play(bytes);
+      fake._positionChangedController.add(const Duration(seconds: 2));
+      fake._durationChangedController.add(const Duration(seconds: 10));
+      await Future<void>.delayed(Duration.zero);
+      expect(session.positionFor(bytes), const Duration(seconds: 2));
+      expect(session.durationFor(bytes), const Duration(seconds: 10));
+
+      // playFrom() haengt fest (Completer offen) - der (Nicht-)Reset muss trotzdem
+      // schon VOR dem Abschluss des await sichtbar sein, gleiches Timing wie beim
+      // Trackwechsel-Test oben.
+      fake.playFromCompleter = Completer<void>();
+      final seekCall = session.playFrom(bytes, const Duration(seconds: 5));
+
+      // Dieselbe Spur (identische Bytes-Referenz) seekt nur innerhalb sich selbst -
+      // der zuvor bekannte Tick darf NICHT auf Duration.zero zurueckfallen.
+      expect(session.positionFor(bytes), isNot(Duration.zero));
+      expect(session.durationFor(bytes), const Duration(seconds: 10));
+
+      fake.playFromCompleter!.complete();
+      await seekCall;
+    });
+
+    test(
         'Bloßes Erzeugen einer SessionState und Abonnieren von onPositionChanged baut den '
         'lazy Player nicht (Regressionsschutz fuer die Lazy-Invariante)', () {
       var buildCount = 0;

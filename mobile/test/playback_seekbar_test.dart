@@ -22,6 +22,7 @@ import 'package:singing_feedback_mobile/widgets/playback_seekbar.dart';
 /// ueberprueft werden kann.
 class _FakePlaybackController implements AudioPlaybackController {
   Completer<void>? playFromCompleter;
+  Object? throwOnPlayFrom;
   int playFromCallCount = 0;
   final List<(Uint8List, Duration)> playFromCalls = [];
   final _completeController = StreamController<void>.broadcast();
@@ -38,6 +39,7 @@ class _FakePlaybackController implements AudioPlaybackController {
     if (playFromCompleter != null) {
       await playFromCompleter!.future;
     }
+    if (throwOnPlayFrom != null) throw throwOnPlayFrom!;
   }
 
   @override
@@ -232,7 +234,9 @@ void main() {
 
     testWidgets(
         'didUpdateWidget mitten im Drag setzt _dragValue/Fehlertext zurueck - kein '
-        'stale Seek gegen die alten Bytes', (tester) async {
+        'stale Seek gegen die alten Bytes, kein stale Drag-Wert und keine stale '
+        'Fehlermeldung sichtbar, sobald die neue Spur tatsaechlich Dauer hat',
+        (tester) async {
       final fake = _FakePlaybackController();
       final session = _buildSession(fake);
       final bytesOld = Uint8List.fromList([1, 2, 3]);
@@ -247,25 +251,54 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      // Aktiver Drag: nur lokaler State, kein playFrom-Aufruf.
-      final slider = tester.widget<Slider>(find.byType(Slider));
+      // Erst einen fehlschlagenden Seek gegen die ALTEN Bytes ausloesen, damit
+      // _errorMessage gesetzt ist - dieser Zweig von didUpdateWidget (Fehlertext-
+      // Reset) hatte bislang keinen eigenen Test.
+      fake.throwOnPlayFrom = Exception('Geraetefehler');
+      var slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChangeEnd!(20.0);
+      await tester.pump();
+      await tester.pump();
+      expect(find.textContaining('Sprung fehlgeschlagen'), findsOneWidget);
+      fake.throwOnPlayFrom = null;
+
+      // Aktiver Drag: nur lokaler State, kein weiterer playFrom-Aufruf.
+      slider = tester.widget<Slider>(find.byType(Slider));
       slider.onChanged!(30.0);
       await tester.pump();
       expect(find.text('0:30'), findsOneWidget);
-      expect(fake.playFromCallCount, 0);
+      final playFromCallsBeforeSwap = fake.playFromCallCount;
 
       // Bytes wechseln waehrend des Drags (z.B. Elternwidget springt zu anderer Spur).
       await tester
           .pumpWidget(_wrap(session, PlaybackSeekbar(audioBytes: bytesNew)));
       await tester.pump();
 
-      // Kein Seek gegen die alten Bytes wurde ausgeloest.
-      expect(fake.playFromCallCount, 0);
-      // Neue Bytes spielen nicht -> Slider ohne Dauer, kein stale Drag-Wert mehr sichtbar.
+      // Kein weiterer Seek wurde ausgeloest (kein stale Seek gegen die alten Bytes).
+      expect(fake.playFromCallCount, playFromCallsBeforeSwap);
+      // Die stale Fehlermeldung von den alten Bytes darf nicht mehr sichtbar sein.
+      expect(find.textContaining('Sprung fehlgeschlagen'), findsNothing);
+
+      // Die neuen Bytes jetzt TATSAECHLICH abspielen + einen Dauer-Tick liefern,
+      // damit hasDuration==true wird. Ohne das wuerde der Slider allein durch den
+      // disabled-Zweig (hasDuration==false -> value fest 0) auf 0 stehen, selbst
+      // wenn _dragValue nie zurueckgesetzt worden waere - der Test wuerde dann
+      // "gruen" bleiben, auch wenn der Reset in didUpdateWidget entfernt wuerde.
+      // Erst so spiegelt der angezeigte Wert wirklich den internen _dragValue-
+      // Zustand (bzw. dessen Abwesenheit) wider.
+      await session.play(bytesNew);
+      await tester.pump();
+      fake._durationChangedController.add(const Duration(seconds: 50));
+      await tester.pump();
+      await tester.pump();
+
       final newSlider = tester.widget<Slider>(find.byType(Slider));
-      expect(newSlider.max, 1);
+      expect(newSlider.onChanged, isNotNull);
+      expect(newSlider.max, 50.0);
+      // Kein stale Drag-Wert (0:30 von den alten Bytes) leckt durch - Position ist
+      // frisch 0:00 fuer die neue, gerade erst gestartete Spur.
       expect(newSlider.value, 0);
-      expect(find.text('0:00'), findsNWidgets(2));
+      expect(find.text('0:00'), findsOneWidget);
     });
   });
 }

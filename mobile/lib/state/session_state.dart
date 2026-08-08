@@ -169,9 +169,16 @@ class SessionState extends ChangeNotifier {
 
   Future<void> play(Uint8List bytes) async {
     final generation = _playbackGeneration = Object();
+    // Nur bei einem echten Trackwechsel (andere Bytes-Identitaet) zuruecksetzen -
+    // sonst wuerde z.B. ein Re-Play derselben Bytes (oder ein playFrom()-Seek
+    // innerhalb derselben Spur) hier faelschlich kurz die Dauer/Position auf 0
+    // reissen, obwohl dieselbe Spur weiterlaeuft (Regression: Seekbar blitzte auf
+    // 0:00 und wurde kurz disabled bei jedem Tap-to-Seek).
+    if (!identical(_playingBytes, bytes)) {
+      _lastKnownPosition = Duration.zero;
+      _lastKnownDuration = Duration.zero;
+    }
     _playingBytes = bytes;
-    _lastKnownPosition = Duration.zero;
-    _lastKnownDuration = Duration.zero;
     await _playbackController.play(bytes);
     if (generation != _playbackGeneration) return;
     isPlaying = true;
@@ -180,9 +187,13 @@ class SessionState extends ChangeNotifier {
 
   Future<void> playFrom(Uint8List bytes, Duration position) async {
     final generation = _playbackGeneration = Object();
+    // Siehe Kommentar in play() oben - gleiches Prinzip: nur bei echtem
+    // Trackwechsel zuruecksetzen, nicht bei einem Seek innerhalb derselben Spur.
+    if (!identical(_playingBytes, bytes)) {
+      _lastKnownPosition = Duration.zero;
+      _lastKnownDuration = Duration.zero;
+    }
     _playingBytes = bytes;
-    _lastKnownPosition = Duration.zero;
-    _lastKnownDuration = Duration.zero;
     await _playbackController.playFrom(bytes, position);
     if (generation != _playbackGeneration) return;
     isPlaying = true;
