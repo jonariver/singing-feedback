@@ -703,6 +703,51 @@ def test_score_performance_skips_glide_for_missed_notes():
     assert "haeufiges_hineingleiten" not in result["summary"]["problem_tags"]
 
 
+def test_score_performance_flags_pause_and_adds_problem_tag():
+    # Zielnote 3.0s bei 440Hz (gehalten). Gesang deckt die ganze Note ab, mit einer
+    # 0.4s langen unstimmhaften Luecke in der Mitte - eine klare, hoerbare Pause
+    # mitten in der gehaltenen Note.
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(300)]
+    voiced_before = [
+        _sung_frame(round(0.05 + i * 0.01, 3), 440.0, aligned_t=round(0.05 + i * 0.01, 3))
+        for i in range(95)
+    ]
+    gap_frames = [
+        _sung_frame(round(1.00 + i * 0.01, 3), None, voiced=False, aligned_t=round(1.00 + i * 0.01, 3))
+        for i in range(40)
+    ]
+    voiced_after = [
+        _sung_frame(round(1.40 + i * 0.01, 3), 440.0, aligned_t=round(1.40 + i * 0.01, 3))
+        for i in range(160)
+    ]
+    sung_curve = voiced_before + gap_frames + voiced_after
+    result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
+    note = result["notes"][0]
+    assert note["missed"] is False
+    assert note["pause"]["applicable"] is True
+    assert note["pause"]["flag"] is True
+    assert result["summary"]["pause_flagged_count"] == 1
+    assert "unerwartete_pause_in_gehaltener_note" in result["summary"]["problem_tags"]
+
+
+def test_score_performance_skips_pause_for_missed_notes():
+    # Zielnote 3.0s. Gesang deckt nur die ersten 0.30s ab (Coverage ca. 8% -> verfehlt),
+    # der Rest der Note ist komplett unstimmhaft - rein rechnerisch eine riesige
+    # "Luecke", aber das Gating in score.py darf compute_pause() bei einer verfehlten
+    # Note gar nicht erst aufrufen.
+    target_curve = [{"t": round(i * 0.01, 3), "hz": 440.0, "midi_note": 69} for i in range(300)]
+    sung_curve = [
+        _sung_frame(round(0.05 + i * 0.01, 3), 440.0, aligned_t=round(0.05 + i * 0.01, 3))
+        for i in range(25)
+    ]
+    result = score_performance(target_curve, sung_curve, frame_rate_hz=100.0)
+    note = result["notes"][0]
+    assert note["missed"] is True
+    assert note["pause"] == {"applicable": False, "gap_seconds": None, "flag": False}
+    assert result["summary"]["pause_flagged_count"] == 0
+    assert "unerwartete_pause_in_gehaltener_note" not in result["summary"]["problem_tags"]
+
+
 def test_score_performance_skips_glide_for_timing_flagged_notes():
     # Gleiche Kopf/Rest-Frame-Konstruktion wie
     # test_score_performance_flags_glide_and_adds_problem_tag (Kopf abseits, Rest
