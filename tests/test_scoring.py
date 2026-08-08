@@ -406,7 +406,7 @@ def test_compute_pause_flags_genuine_gap_in_held_note():
     result = compute_pause(note, voiced_before + gap_frames + voiced_after)
     assert result["applicable"] is True
     assert result["flag"] is True
-    assert result["gap_seconds"] == pytest.approx(0.29, abs=0.01)
+    assert result["gap_seconds"] == pytest.approx(0.30, abs=0.01)
 
 
 def test_compute_pause_does_not_flag_short_gap():
@@ -427,7 +427,7 @@ def test_compute_pause_does_not_flag_short_gap():
     result = compute_pause(note, voiced_before + gap_frames + voiced_after)
     assert result["applicable"] is True
     assert result["flag"] is False
-    assert result["gap_seconds"] == pytest.approx(0.09, abs=0.01)
+    assert result["gap_seconds"] == pytest.approx(0.10, abs=0.01)
 
 
 def test_compute_pause_not_applicable_for_short_note():
@@ -469,6 +469,43 @@ def test_compute_pause_excludes_onset_trim_window():
     assert result["applicable"] is True
     assert result["flag"] is False
     assert result["gap_seconds"] == pytest.approx(0.0, abs=0.001)
+
+
+def test_compute_pause_flags_gap_extending_to_window_end():
+    # Gehaltene Note 1.0-2.0s. Stimmhaft von 1.05s (Onset-Trim) bis 1.50s, danach
+    # DURCHGEHEND unstimmhaft bis 1.99s (letzter Frame vor window_end=2.0) - der Lauf
+    # ist beim Verlassen der Schleife noch offen und wird ausschliesslich vom
+    # Post-Loop-Flush erfasst.
+    note = {"start_t": 1.0, "end_t": 2.0, "hz": 440.0}
+    voiced = [
+        _sung_frame(round(1.05 + i * 0.01, 3), 440.0, aligned_t=round(1.05 + i * 0.01, 3))
+        for i in range(46)
+    ]
+    unvoiced_tail = [
+        _sung_frame(round(1.51 + i * 0.01, 3), None, voiced=False, aligned_t=round(1.51 + i * 0.01, 3))
+        for i in range(49)
+    ]
+    result = compute_pause(note, voiced + unvoiced_tail)
+    assert result["applicable"] is True
+    assert result["flag"] is True
+    assert result["gap_seconds"] == pytest.approx(0.49, abs=0.01)
+
+
+def test_compute_pause_flags_note_entirely_unvoiced_in_window():
+    # Gehaltene Note 1.0-2.0s, deren betrachtetes Fenster [1.05, 2.0) ausschliesslich
+    # unstimmhafte Frames enthaelt (kein einziger stimmhafter Frame). Anders als
+    # test_compute_pause_not_applicable_without_frames_in_window (dort gibt es GAR
+    # KEINE Frames im Fenster) sind hier Frames vorhanden, nur eben durchgehend
+    # unstimmhaft - applicable muss True bleiben.
+    note = {"start_t": 1.0, "end_t": 2.0, "hz": 440.0}
+    frames = [
+        _sung_frame(round(1.05 + i * 0.01, 3), None, voiced=False, aligned_t=round(1.05 + i * 0.01, 3))
+        for i in range(95)
+    ]
+    result = compute_pause(note, frames)
+    assert result["applicable"] is True
+    assert result["flag"] is True
+    assert result["gap_seconds"] == pytest.approx(0.95, abs=0.01)
 
 
 def test_hz_to_midi_note_reference_a4():
