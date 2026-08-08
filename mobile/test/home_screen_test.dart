@@ -35,13 +35,26 @@ Widget _wrap(SessionState session) {
 }
 
 void main() {
-  testWidgets('alle fuenf Abschnitts-Titel sind initial sichtbar', (tester) async {
+  testWidgets('alle fuenf Abschnitts-Titel sind initial sichtbar (ggf. nach Scrollen)',
+      (tester) async {
     await tester.pumpWidget(_wrap(_buildSession()));
 
+    // Bei vollstaendig aufgeklappten Abschnitten ist der Screen laenger als
+    // der Viewport - wie auf einem echten Handy muss man zu spaeteren
+    // Abschnitten scrollen, um sie zu sehen. Das ist kein Test-Artefakt,
+    // sondern erwartetes Verhalten einer scrollbaren ListView.
+    final scrollable = find.byType(Scrollable).first;
     expect(find.text('1. Zielmelodie'), findsOneWidget);
     expect(find.text('2. Gesangsaufnahme'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('3. Tonhöhen-Vergleich'), 200,
+        scrollable: scrollable);
     expect(find.text('3. Tonhöhen-Vergleich'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('4. Bewertung'), 200, scrollable: scrollable);
     expect(find.text('4. Bewertung'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('5. Feedback'), 200, scrollable: scrollable);
     expect(find.text('5. Feedback'), findsOneWidget);
   });
 
