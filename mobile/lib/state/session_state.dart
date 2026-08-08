@@ -43,6 +43,8 @@ abstract class AudioPlaybackController {
   Future<void> pause();
   Future<void> stop();
   Stream<void> get onComplete;
+  Stream<Duration> get onPositionChanged;
+  Stream<Duration> get onDurationChanged;
   void dispose();
 }
 
@@ -65,6 +67,12 @@ class _RealAudioPlaybackController implements AudioPlaybackController {
 
   @override
   Stream<void> get onComplete => _player.onPlayerComplete;
+
+  @override
+  Stream<Duration> get onPositionChanged => _player.onPositionChanged;
+
+  @override
+  Stream<Duration> get onDurationChanged => _player.onDurationChanged;
 
   @override
   void dispose() {

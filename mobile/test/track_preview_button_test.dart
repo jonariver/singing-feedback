@@ -31,6 +31,8 @@ class _FakePlaybackController implements AudioPlaybackController {
   int playCallCount = 0;
   int pauseCallCount = 0;
   final _completeController = StreamController<void>.broadcast();
+  final _positionChangedController = StreamController<Duration>.broadcast();
+  final _durationChangedController = StreamController<Duration>.broadcast();
 
   @override
   Future<void> play(Uint8List bytes) async {
@@ -52,8 +54,16 @@ class _FakePlaybackController implements AudioPlaybackController {
   Stream<void> get onComplete => _completeController.stream;
 
   @override
+  Stream<Duration> get onPositionChanged => _positionChangedController.stream;
+
+  @override
+  Stream<Duration> get onDurationChanged => _durationChangedController.stream;
+
+  @override
   void dispose() {
     unawaited(_completeController.close());
+    unawaited(_positionChangedController.close());
+    unawaited(_durationChangedController.close());
   }
 }
 

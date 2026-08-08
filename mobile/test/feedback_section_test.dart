@@ -64,6 +64,12 @@ class _FakePlaybackController implements AudioPlaybackController {
   Stream<void> get onComplete => const Stream.empty();
 
   @override
+  Stream<Duration> get onPositionChanged => const Stream.empty();
+
+  @override
+  Stream<Duration> get onDurationChanged => const Stream.empty();
+
+  @override
   void dispose() {}
 }
 
