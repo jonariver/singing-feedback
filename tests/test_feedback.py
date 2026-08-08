@@ -224,6 +224,52 @@ def test_request_feedback_points_extracts_points_from_tool_use_block():
     assert points == [{"problem": "P", "uebung_id": "a"}]
 
 
+def test_request_feedback_points_parses_stringified_points_json():
+    # Bei sehr langen/komplexen Tool-Inputs liefert Claude "points" gelegentlich als
+    # JSON-kodierten String statt als natives Array (beobachtet live bei einer echten
+    # 77-Noten-Aufnahme mit 3 langen Punkten - nie bei kurzen synthetischen Tests).
+    import json
+
+    points = [{"problem": "P", "uebung_id": "a", "wiederholungsaufgabe": "W"}]
+    fake = _FakeMessagesClient(points=json.dumps(points))
+    result = request_feedback_points(fake, "claude-sonnet-5", "prompt", ["a"])
+    assert result == points
+
+
+def test_request_feedback_points_raises_on_unparsable_stringified_points():
+    fake = _FakeMessagesClient(points="not valid json {")
+    with pytest.raises(RuntimeError):
+        request_feedback_points(fake, "claude-sonnet-5", "prompt", ["a"])
+
+
+def test_request_feedback_points_wraps_a_single_point_dict_in_a_list():
+    # Bei genau einem Feedback-Punkt liefert Claude "points" gelegentlich als
+    # einzelnes Objekt statt als 1-elementiges Array (beobachtet live).
+    single_point = {"problem": "P", "uebung_id": "a", "wiederholungsaufgabe": "W"}
+    fake = _FakeMessagesClient(points=single_point)
+    result = request_feedback_points(fake, "claude-sonnet-5", "prompt", ["a"])
+    assert result == [single_point]
+
+
+def test_request_feedback_points_raises_on_unexpected_points_type():
+    fake = _FakeMessagesClient(points=42)
+    with pytest.raises(RuntimeError):
+        request_feedback_points(fake, "claude-sonnet-5", "prompt", ["a"])
+
+
+def test_request_feedback_points_unwraps_doubly_nested_points():
+    # Bei genau einem Punkt liefert Claude "points" gelegentlich als 1-elementiges
+    # Array, dessen einziges Element wiederum ein Wrapper-Dict mit einem
+    # verschachtelten "points"-Schluessel ist (beobachtet live).
+    real_points = [
+        {"problem": "P1", "uebung_id": "a"},
+        {"problem": "P2", "uebung_id": "b"},
+    ]
+    fake = _FakeMessagesClient(points=[{"points": real_points}])
+    result = request_feedback_points(fake, "claude-sonnet-5", "prompt", ["a", "b"])
+    assert result == real_points
+
+
 def test_request_feedback_points_passes_catalog_ids_as_enum_in_tool_schema():
     fake = _FakeMessagesClient(points=[])
     request_feedback_points(fake, "claude-sonnet-5", "prompt", ["a", "b"])
