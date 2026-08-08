@@ -35,6 +35,38 @@ ScoreNote _glideNote({required String direction}) {
   );
 }
 
+ScoreNote _pauseNote({required double gapSeconds}) {
+  return ScoreNote(
+    index: 0,
+    startT: 0.0,
+    endT: 3.0,
+    targetHz: 440.0,
+    targetMidiNote: 69,
+    missed: false,
+    coverageFraction: 1.0,
+    centsValue: 2.0,
+    centsClassification: 'green',
+    timingDeviationMs: 4.0,
+    timingClassification: 'on_time',
+    held: true,
+    stabilityApplicable: true,
+    stabilityMadCents: 0.5,
+    stabilityFlag: false,
+    driftApplicable: true,
+    driftCents: 0.2,
+    phraseEndDriftFlag: false,
+    driftDirection: null,
+    glideApplicable: true,
+    glideOnsetCentsDeviation: 0.0,
+    glideFlag: false,
+    glideDirection: null,
+    pauseApplicable: true,
+    pauseGapSeconds: gapSeconds,
+    pauseFlag: true,
+    sungT: 0.1,
+  );
+}
+
 ScoreResult _resultWith(ScoreNote note) {
   return ScoreResult(
     notes: [note],
@@ -98,6 +130,21 @@ void main() {
       home: Scaffold(body: ScoreSummaryView(result: _resultWith(_glideNote(direction: 'down')))),
     ));
     expect(find.textContaining('gerutscht (von oben)'), findsOneWidget);
+  });
+
+  testWidgets('zeigt Pausen-Hinweis mit Luecken-Dauer fuer eine pausierte Note',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: ScoreSummaryView(result: _resultWith(_pauseNote(gapSeconds: 0.34)))),
+    ));
+    expect(find.textContaining('Pause mitten in der Note (0.34s)'), findsOneWidget);
+  });
+
+  testWidgets('zeigt keinen Pausen-Hinweis, wenn pauseFlag false ist', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: ScoreSummaryView(result: _resultWith(_glideNote(direction: 'up')))),
+    ));
+    expect(find.textContaining('Pause mitten in der Note'), findsNothing);
   });
 
   testWidgets('zeigt Stimmumfang, wenn vocalRange.applicable true ist', (tester) async {

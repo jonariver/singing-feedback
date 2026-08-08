@@ -47,6 +47,9 @@ class ScoreSummaryView extends StatelessWidget {
       final direction = note.glideDirection == 'up' ? 'von unten' : 'von oben';
       parts.add('gerutscht ($direction)');
     }
+    if (note.pauseFlag) {
+      parts.add('Pause mitten in der Note (${note.pauseGapSeconds!.toStringAsFixed(2)}s)');
+    }
     if (note.stabilityFlag) parts.add('instabil');
     if (note.missed) parts.add('verfehlt');
     return 'Note ${note.index + 1}: ${parts.join(' · ')}';
