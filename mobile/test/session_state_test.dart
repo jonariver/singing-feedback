@@ -869,6 +869,64 @@ void main() {
     });
 
     test(
+        'playFrom() setzt positionFor(bytes) synchron optimistisch auf das Seek-Ziel, '
+        'noch bevor der zugrundeliegende Player-Aufruf abschliesst oder ein Positions-Tick '
+        'eintrifft (Regression: die Seekbar zeigte nach jedem Tap-to-Seek fuer 100-300ms '
+        'wieder die ALTE Position, weil der Aufrufer seinen lokalen Drag-Wert sofort '
+        'zuruecksetzte und positionFor(bytes) bis zum naechsten echten Tick auf dem alten '
+        'Stand blieb)', () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await session.play(bytes);
+      fake._positionChangedController.add(const Duration(seconds: 10));
+      fake._durationChangedController.add(const Duration(seconds: 100));
+      await Future<void>.delayed(Duration.zero);
+      expect(session.positionFor(bytes), const Duration(seconds: 10));
+
+      // playFrom() haengt fest (Completer offen) - das Seek-Ziel muss trotzdem
+      // schon VOR dem Abschluss des await UND ohne jeden neuen Positions-Tick
+      // sichtbar sein.
+      fake.playFromCompleter = Completer<void>();
+      final seekCall = session.playFrom(bytes, const Duration(seconds: 90));
+
+      expect(session.positionFor(bytes), const Duration(seconds: 90));
+
+      fake.playFromCompleter!.complete();
+      await seekCall;
+      expect(session.positionFor(bytes), const Duration(seconds: 90));
+    });
+
+    test(
+        'playFrom() auf eine ANDERE Spur (echter Trackwechsel) setzt positionFor(bytes) '
+        'ebenfalls synchron optimistisch auf das Seek-Ziel (z.B. "Sprung zu dieser Position" '
+        'aus der Feedback-Karte auf eine andere Spur)', () async {
+      final fake = _FakePlaybackController();
+      final session = _buildSessionWithPlayback(fake);
+      final bytesA = Uint8List.fromList([1, 2, 3]);
+      final bytesB = Uint8List.fromList([4, 5, 6]);
+
+      await session.play(bytesA);
+      fake._positionChangedController.add(const Duration(seconds: 10));
+      fake._durationChangedController.add(const Duration(seconds: 100));
+      await Future<void>.delayed(Duration.zero);
+
+      fake.playFromCompleter = Completer<void>();
+      final seekCall = session.playFrom(bytesB, const Duration(seconds: 30));
+
+      // Trackwechsel: Dauer wird zurueckgesetzt, Position aber optimistisch auf
+      // das Ziel gesetzt.
+      expect(session.positionFor(bytesB), const Duration(seconds: 30));
+      expect(session.durationFor(bytesB), Duration.zero);
+      // Die alte Spur zeigt jetzt (weil sie nicht mehr _playingBytes ist) 0.
+      expect(session.positionFor(bytesA), Duration.zero);
+
+      fake.playFromCompleter!.complete();
+      await seekCall;
+    });
+
+    test(
         'play() mit denselben Bytes nach pause() (Erneut-abspielen) setzt '
         'positionFor/durationFor synchron auf Duration.zero zurueck (Regression: die vorige '
         'Fix-Runde uebernahm den identical()-Guard aus playFrom() faelschlich auch in play(), '

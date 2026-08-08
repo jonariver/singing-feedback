@@ -300,5 +300,127 @@ void main() {
       expect(newSlider.value, 0);
       expect(find.text('0:00'), findsOneWidget);
     });
+
+    testWidgets(
+        'Trackwechsel-Handoff zwischen zwei gleichzeitig montierten Seekbars: play() auf '
+        'die Gesangsspur setzt die zuvor live laufende Referenz-Seekbar synchron zurueck '
+        'auf disabled/0:00 (Ganzbranch-Review-Luecke - Einzeltests deckten je nur eine '
+        'Bar isoliert ab, nie den tatsaechlichen Handoff zwischen zwei montierten Bars)',
+        (tester) async {
+      final fake = _FakePlaybackController();
+      final session = _buildSession(fake);
+      final referenceBytes = Uint8List.fromList([1, 2, 3]);
+      final sungBytes = Uint8List.fromList([4, 5, 6]);
+
+      await tester.pumpWidget(_wrap(
+        session,
+        Column(children: [
+          PlaybackSeekbar(audioBytes: referenceBytes),
+          PlaybackSeekbar(audioBytes: sungBytes),
+        ]),
+      ));
+
+      await session.play(referenceBytes);
+      await tester.pump();
+      fake._durationChangedController.add(const Duration(seconds: 100));
+      fake._positionChangedController.add(const Duration(seconds: 40));
+      await tester.pump();
+      await tester.pump();
+
+      var sliders = tester.widgetList<Slider>(find.byType(Slider)).toList();
+      expect(sliders[0].max, 100.0);
+      expect(sliders[0].value, 40.0);
+      expect(sliders[0].onChanged, isNotNull);
+      expect(find.text('0:40'), findsOneWidget);
+
+      // Jetzt auf die Gesangsspur wechseln - die Referenz-Bar ist nicht mehr
+      // die abgespielte Spur.
+      await session.play(sungBytes);
+      await tester.pump();
+      await tester.pump();
+
+      sliders = tester.widgetList<Slider>(find.byType(Slider)).toList();
+      expect(sliders[0].max, 1);
+      expect(sliders[0].value, 0);
+      expect(sliders[0].onChanged, isNull);
+      // Beide Bars zeigen jetzt 0:00/0:00 (Referenz zurueckgesetzt, Gesang noch
+      // ohne Tick) - macht 4 Vorkommen von "0:00" ueber beide Bars hinweg.
+      expect(find.text('0:00'), findsNWidgets(4));
+    });
+
+    testWidgets(
+        'stop() setzt die Seekbar zurueck auf disabled/0:00 (analog zu setReferenceSource()/'
+        'uploadMidi(), die beide stop() im geteilten Player aufrufen)',
+        (tester) async {
+      final fake = _FakePlaybackController();
+      final session = _buildSession(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await tester
+          .pumpWidget(_wrap(session, PlaybackSeekbar(audioBytes: bytes)));
+
+      await session.play(bytes);
+      await tester.pump();
+      fake._durationChangedController.add(const Duration(seconds: 80));
+      fake._positionChangedController.add(const Duration(seconds: 20));
+      await tester.pump();
+      await tester.pump();
+
+      var slider = tester.widget<Slider>(find.byType(Slider));
+      expect(slider.max, 80.0);
+      expect(slider.value, 20.0);
+
+      await session.stop();
+      await tester.pump();
+      await tester.pump();
+
+      slider = tester.widget<Slider>(find.byType(Slider));
+      expect(slider.max, 1);
+      expect(slider.value, 0);
+      expect(slider.onChanged, isNull);
+      expect(find.text('0:00'), findsNWidgets(2));
+    });
+
+    testWidgets(
+        'nach onChangeEnd zeigt die Seekbar sofort das Seek-Ziel, noch bevor irgendein '
+        'Stream-Tick eintrifft oder playFrom() zurueckkehrt (pinnt Finding 1: '
+        'SessionState.playFrom setzt _lastKnownPosition jetzt synchron optimistisch auf '
+        'das Seek-Ziel - vorher blitzte die Bar fuer 100-300ms zurueck auf die ALTE '
+        'Position, weil _dragValue schon zurueckgesetzt war, bevor der erste echte '
+        'Positions-Tick eintraf)', (tester) async {
+      final fake = _FakePlaybackController();
+      final session = _buildSession(fake);
+      final bytes = Uint8List.fromList([1, 2, 3]);
+
+      await tester
+          .pumpWidget(_wrap(session, PlaybackSeekbar(audioBytes: bytes)));
+
+      await session.play(bytes);
+      await tester.pump();
+      fake._durationChangedController.add(const Duration(seconds: 200));
+      fake._positionChangedController.add(const Duration(seconds: 10));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('0:10'), findsOneWidget);
+
+      // playFrom() haengt fest (Completer offen) - weder loest es auf, noch
+      // trifft irgendein neuer Stream-Tick ein.
+      fake.playFromCompleter = Completer<void>();
+      final slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChangeEnd!(150.0);
+      await tester.pump();
+      await tester.pump();
+
+      // Die alte Position (0:10) darf nicht mehr sichtbar sein - stattdessen
+      // sofort das Seek-Ziel (150s = 2:30), obwohl playFrom() noch haengt und
+      // kein einziger Tick eintraf.
+      expect(find.text('0:10'), findsNothing);
+      expect(find.text('2:30'), findsOneWidget);
+
+      fake.playFromCompleter!.complete();
+      await tester.pump();
+      await tester.pump();
+    });
   });
 }

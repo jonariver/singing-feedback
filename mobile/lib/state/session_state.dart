@@ -189,16 +189,27 @@ class SessionState extends ChangeNotifier {
   Future<void> playFrom(Uint8List bytes, Duration position) async {
     final generation = _playbackGeneration = Object();
     // Anders als play() oben: playFrom() ist der eigentliche Seek-Einstiegspunkt.
-    // Nur bei einem echten Trackwechsel (andere Bytes-Identitaet) zuruecksetzen -
-    // sonst wuerde ein Seek innerhalb derselben Spur hier faelschlich kurz die
-    // Dauer/Position auf 0 reissen, obwohl dieselbe Spur weiterlaeuft (Regression:
-    // Seekbar blitzte auf 0:00 und wurde kurz disabled bei jedem Tap-to-Seek).
-    // Ein echter Bytes-Wechsel (z.B. "Sprung zu dieser Position" aus der
-    // Feedback-Karte auf eine andere Spur) soll dagegen weiterhin zuruecksetzen.
+    // Dauer nur bei einem echten Trackwechsel (andere Bytes-Identitaet)
+    // zuruecksetzen - sonst wuerde ein Seek innerhalb derselben Spur hier
+    // faelschlich kurz die Dauer auf 0 reissen, obwohl dieselbe Spur weiterlaeuft
+    // (Regression: Seekbar blitzte auf 0:00 und wurde kurz disabled bei jedem
+    // Tap-to-Seek). Ein echter Bytes-Wechsel (z.B. "Sprung zu dieser Position"
+    // aus der Feedback-Karte auf eine andere Spur) soll dagegen weiterhin
+    // zuruecksetzen.
+    //
+    // Position wird dagegen IMMER optimistisch auf `position` (das Seek-Ziel)
+    // gesetzt - unabhaengig davon, ob es ein Trackwechsel oder ein Seek in der
+    // gleichen Spur ist. Ohne das wuerde die Seekbar nach einem Seek kurzzeitig
+    // wieder die ALTE Position anzeigen (bis der naechste echte Positions-Tick
+    // eintrifft, bis zu ~200ms), sobald der Aufrufer seinen eigenen lokalen
+    // Drag-Wert zuruecksetzt und wieder auf positionFor(bytes) zurueckfaellt -
+    // genau das macht PlaybackSeekbar._seekTo. Bei einem echten Trackwechsel ist
+    // das ebenfalls korrekt: die neue Spur startet legitim bei `position` (auch
+    // von den Feedback-Karten-Sprungbuttons genutzt).
     if (!identical(_playingBytes, bytes)) {
-      _lastKnownPosition = Duration.zero;
       _lastKnownDuration = Duration.zero;
     }
+    _lastKnownPosition = position;
     _playingBytes = bytes;
     await _playbackController.playFrom(bytes, position);
     if (generation != _playbackGeneration) return;
