@@ -10,6 +10,7 @@ import '../api/audio_api.dart';
 import '../api/midi_api.dart';
 import '../api/score_api.dart';
 import '../api/feedback_api.dart';
+import '../models/feedback_provider.dart';
 import '../models/feedback_result.dart';
 import '../api/sync_api.dart';
 import '../models/score_result.dart';
@@ -23,6 +24,7 @@ enum LoadStatus { idle, loading, ok, warning, error }
 enum ReferenceSource { midi, recording }
 
 const String _tolerancePresetPrefsKey = 'tolerance_preset';
+const String _feedbackProviderPrefsKey = 'feedback_provider';
 
 /// Formatiert eine Sekundenzahl als m:ss, z.B. fuer Kuerzungs-Warnmeldungen
 /// ("Aufnahme war 1:56 lang..."). Rundet auf ganze Sekunden.
@@ -286,6 +288,11 @@ class SessionState extends ChangeNotifier {
   /// asynchron per loadPersistedTolerancePreset() nachgeladen (siehe dort).
   TolerancePreset tolerancePreset = TolerancePreset.normal;
 
+  /// Waehlbarer Anbieter fuer die Feedback-Generierung, Default aus dem
+  /// Konstruktor, danach ggf. asynchron per loadPersistedFeedbackProvider()
+  /// nachgeladen (siehe dort) - gleiches Muster wie tolerancePreset.
+  FeedbackProvider feedbackProvider = FeedbackProvider.anthropic;
+
   ScoreResult? scoreResult;
   LoadStatus scoreStatus = LoadStatus.idle;
   String scoreMessage = '';
@@ -439,6 +446,30 @@ class SessionState extends ChangeNotifier {
     }
   }
 
+  Future<void> setFeedbackProvider(FeedbackProvider provider) async {
+    feedbackProvider = provider;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_feedbackProviderPrefsKey, provider.apiValue);
+    // Bewusst KEIN automatisches requestFeedback() hier, anders als
+    // setTolerancePreset()'s Auto-Rescore: ein Feedback-Aufruf ist
+    // kostenpflichtig und soll ausschliesslich per expliziten Nutzer-Tap
+    // ausgeloest werden (siehe Kommentar an requestFeedback() unten).
+  }
+
+  /// Laedt einen zuvor gespeicherten Feedback-Provider (falls vorhanden) und
+  /// wendet ihn an - bewusst NICHT im Konstruktor, sondern nur von main.dart
+  /// nach dem Bauen dieser SessionState aufgerufen (fire-and-forget), gleiches
+  /// Prinzip wie loadPersistedTolerancePreset().
+  Future<void> loadPersistedFeedbackProvider() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = FeedbackProvider.fromApiValue(prefs.getString(_feedbackProviderPrefsKey));
+    if (stored != null && stored != feedbackProvider) {
+      feedbackProvider = stored;
+      notifyListeners();
+    }
+  }
+
   Future<void> analyzeAudio(Uint8List bytes, String filename) async {
     sungAudioBytes = bytes;
     sungAudioFilename = filename;
@@ -561,7 +592,7 @@ class SessionState extends ChangeNotifier {
     feedbackMessage = 'Hole Feedback…';
     notifyListeners();
     try {
-      feedbackResult = await feedbackApi.requestFeedback(scoreResult!.toJson());
+      feedbackResult = await feedbackApi.requestFeedback(scoreResult!.toJson(), feedbackProvider);
       feedbackStatus = LoadStatus.ok;
       feedbackMessage = 'Feedback fertig.';
     } catch (e) {

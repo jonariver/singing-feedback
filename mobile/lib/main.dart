@@ -32,6 +32,7 @@ class SingingFeedbackApp extends StatelessWidget {
           feedbackApi: FeedbackApi(apiClient),
         );
         unawaited(session.loadPersistedTolerancePreset());
+        unawaited(session.loadPersistedFeedbackProvider());
         return session;
       },
       child: MaterialApp(

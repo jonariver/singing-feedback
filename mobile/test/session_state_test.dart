@@ -13,6 +13,7 @@ import 'package:singing_feedback_mobile/models/target_point.dart';
 import 'package:singing_feedback_mobile/state/session_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:singing_feedback_mobile/models/tolerance_preset.dart';
+import 'package:singing_feedback_mobile/models/feedback_provider.dart';
 
 class _FakeApiClient extends ApiClient {
   _FakeApiClient() : super(baseUrl: 'http://fake.local');
@@ -1150,6 +1151,81 @@ void main() {
       await session.loadPersistedTolerancePreset();
 
       expect(session.tolerancePreset, TolerancePreset.normal);
+    });
+  });
+
+  group('SessionState Feedback-Provider', () {
+    test('feedbackProvider startet mit FeedbackProvider.anthropic', () {
+      final session = _buildSession();
+      expect(session.feedbackProvider, FeedbackProvider.anthropic);
+    });
+
+    test('setFeedbackProvider setzt den Wert und sendet ihn bei requestFeedback() mit',
+        () async {
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+      session.setReferenceSource(ReferenceSource.midi);
+      session.midiSessionId = 'sess-1';
+      session.selectedTrackIndex = 0;
+      await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+      await session.score();
+
+      await session.setFeedbackProvider(FeedbackProvider.cloudflare);
+      expect(session.feedbackProvider, FeedbackProvider.cloudflare);
+
+      await session.requestFeedback();
+      expect(client.lastPostJsonBody?['provider'], 'cloudflare');
+    });
+
+    test('setFeedbackProvider loest KEIN automatisches requestFeedback() aus '
+        '(Feedback-Aufrufe sind kostenpflichtig und nur manuell)', () async {
+      final client = _FakeApiClient();
+      final session = SessionState(
+        midiApi: MidiApi(client),
+        audioApi: AudioApi(client),
+        syncApi: SyncApi(client),
+        scoreApi: ScoreApi(client),
+        feedbackApi: FeedbackApi(client),
+      );
+      session.setReferenceSource(ReferenceSource.midi);
+      session.midiSessionId = 'sess-1';
+      session.selectedTrackIndex = 0;
+      await session.analyzeAudio(Uint8List.fromList([1, 2, 3]), 'gesang.wav');
+      await session.score();
+
+      await session.setFeedbackProvider(FeedbackProvider.cloudflare);
+
+      expect(client.feedbackCallCount, 0);
+      expect(session.feedbackStatus, LoadStatus.idle);
+    });
+
+    test('setFeedbackProvider persistiert die Wahl, eine neue SessionState-Instanz '
+        'laedt sie per loadPersistedFeedbackProvider() zurueck', () async {
+      final sessionA = _buildSession();
+      await sessionA.setFeedbackProvider(FeedbackProvider.cloudflare);
+
+      final sessionB = _buildSession();
+      expect(sessionB.feedbackProvider, FeedbackProvider.anthropic,
+          reason: 'vor dem Laden noch der Default');
+      await sessionB.loadPersistedFeedbackProvider();
+
+      expect(sessionB.feedbackProvider, FeedbackProvider.cloudflare);
+    });
+
+    test('loadPersistedFeedbackProvider() aendert nichts, wenn nie etwas '
+        'gespeichert wurde', () async {
+      SharedPreferences.setMockInitialValues({});
+      final session = _buildSession();
+
+      await session.loadPersistedFeedbackProvider();
+
+      expect(session.feedbackProvider, FeedbackProvider.anthropic);
     });
   });
 }
