@@ -47,6 +47,10 @@ def _matches_glide(note: dict) -> bool:
     return note["glide_flag"]
 
 
+def _matches_pause(note: dict) -> bool:
+    return note["pause_flag"]
+
+
 # Bildet dieselbe Bedeutung wie die _PROBLEM_TAG_*-Konstanten in scoring/score.py ab:
 # welches Feld einer geflaggten Note (siehe prompt.py::build_prompt_context) macht sie
 # zu einem Kandidaten fuer die jeweilige Katalog-Kategorie.
@@ -56,6 +60,7 @@ _CATEGORY_MATCHERS: dict[str, Callable[[dict], bool]] = {
     "instabile_lange_toene": _matches_stability,
     "unsaubere_einsaetze": _matches_missed,
     "haeufiges_hineingleiten": _matches_glide,
+    "unerwartete_pause_in_gehaltener_note": _matches_pause,
 }
 
 

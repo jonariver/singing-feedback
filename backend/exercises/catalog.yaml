@@ -21,3 +21,7 @@
   problem: Zu frueher oder verspaeteter Einsatz relativ zur Referenzmelodie
   technik: Rhythmus vom Tonhoehenverlauf entkoppeln und getrennt ueben
   uebung: Text zunaechst rhythmisch sprechen, danach auf einem Ton singen, erst danach die volle Melodie
+- id: unerwartete_pause_in_gehaltener_note
+  problem: Unerwartete Pause/Atemholen mitten in einer gehaltenen Note
+  technik: Atemplanung vor der Phrase statt spontan mitten im Ton
+  uebung: Phrase vorher markieren, wo Luft geholt wird, und gezielt nur dort atmen

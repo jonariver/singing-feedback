@@ -51,6 +51,7 @@ def _note(
     drift_direction: str | None = None,
     glide_flag: bool = False,
     glide_direction: str | None = None,
+    pause_flag: bool = False,
     sung_t: float | None = None,
 ) -> dict:
     return {
@@ -77,6 +78,7 @@ def _note(
             "flag": glide_flag,
             "direction": glide_direction,
         },
+        "pause": {"applicable": True, "gap_seconds": 0.0, "flag": pause_flag},
         "sung_t": sung_t,
     }
 
@@ -94,6 +96,7 @@ def _score_result(notes: list[dict]) -> dict:
             "stability_flagged_count": sum(1 for n in notes if n["stability"]["flag"]),
             "phrase_end_drift_flagged_count": sum(1 for n in notes if n["phrase_end_drift"]["flag"]),
             "glide_flagged_count": sum(1 for n in notes if n["glide"]["flag"]),
+            "pause_flagged_count": sum(1 for n in notes if n["pause"]["flag"]),
             "overall_score": 100.0,
             "problem_tags": [],
         },
@@ -109,10 +112,11 @@ def test_build_prompt_context_filters_out_unflagged_notes():
         _note(4, stability_flag=True),
         _note(5, drift_flag=True, drift_direction="down"),
         _note(6, glide_flag=True, glide_direction="up"),
+        _note(7, pause_flag=True),
     ]
     context = build_prompt_context(_score_result(notes))
     flagged_indices = [n["index"] for n in context["flagged_notes"]]
-    assert flagged_indices == [1, 2, 3, 4, 5, 6]
+    assert flagged_indices == [1, 2, 3, 4, 5, 6, 7]
 
 
 def test_build_prompt_context_includes_summary_unchanged():
@@ -137,6 +141,14 @@ def test_build_prompt_text_mentions_glide():
     text = build_prompt_text(context)
     assert "Hineingleiten in den Zielton: 1 Noten" in text
     assert "rutscht rein (up)" in text
+
+
+def test_build_prompt_text_mentions_pause():
+    notes = [_note(0, pause_flag=True)]
+    context = build_prompt_context(_score_result(notes))
+    text = build_prompt_text(context)
+    assert "Pause mitten in gehaltener Note: 1 Noten" in text
+    assert "Pause mitten in der Note" in text
 
 
 def test_build_prompt_text_says_keine_when_no_flagged_notes():
@@ -338,6 +350,21 @@ def test_generate_feedback_glide_category_resolves_jump_to_t(monkeypatch):
     )
     result = generate_feedback(score_result, messages_client_factory=lambda: fake)
     assert result["points"][0]["jump_to_t"] == 3.5
+
+
+def test_generate_feedback_pause_category_resolves_jump_to_t(monkeypatch):
+    monkeypatch.setattr("backend.feedback.generate.ANTHROPIC_API_KEY", "dummy-key")
+    notes = [_note(0, pause_flag=True, sung_t=5.2)]
+    score_result = _score_result(notes)
+    score_result["summary"]["problem_tags"] = ["unerwartete_pause_in_gehaltener_note"]
+    fake = _FakeMessagesClient(
+        points=[{
+            "problem": "Atempause mitten im Ton",
+            "uebung_id": "unerwartete_pause_in_gehaltener_note",
+        }]
+    )
+    result = generate_feedback(score_result, messages_client_factory=lambda: fake)
+    assert result["points"][0]["jump_to_t"] == 5.2
 
 
 def test_generate_feedback_jump_to_t_is_none_when_no_note_matches(monkeypatch):
