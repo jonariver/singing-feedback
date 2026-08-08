@@ -28,6 +28,9 @@ ScoreNote _glideNote({required String direction}) {
     glideOnsetCentsDeviation: -62.0,
     glideFlag: true,
     glideDirection: direction,
+    pauseApplicable: false,
+    pauseGapSeconds: null,
+    pauseFlag: false,
     sungT: 0.1,
   );
 }
@@ -45,6 +48,7 @@ ScoreResult _resultWith(ScoreNote note) {
       stabilityFlaggedCount: 0,
       phraseEndDriftFlaggedCount: 0,
       glideFlaggedCount: 1,
+      pauseFlaggedCount: 0,
       overallScore: 100.0,
       problemTags: [],
       vocalRange: VocalRange(
@@ -71,6 +75,7 @@ ScoreResult _resultWithVocalRange(VocalRange vocalRange) {
       stabilityFlaggedCount: 0,
       phraseEndDriftFlaggedCount: 0,
       glideFlaggedCount: 0,
+      pauseFlaggedCount: 0,
       overallScore: 100.0,
       problemTags: const [],
       vocalRange: vocalRange,

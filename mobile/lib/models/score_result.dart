@@ -25,6 +25,9 @@ class ScoreNote {
   final double? glideOnsetCentsDeviation;
   final bool glideFlag;
   final String? glideDirection;
+  final bool pauseApplicable;
+  final double? pauseGapSeconds;
+  final bool pauseFlag;
   final double? sungT;
 
   const ScoreNote({
@@ -51,6 +54,9 @@ class ScoreNote {
     required this.glideOnsetCentsDeviation,
     required this.glideFlag,
     required this.glideDirection,
+    required this.pauseApplicable,
+    required this.pauseGapSeconds,
+    required this.pauseFlag,
     required this.sungT,
   });
 
@@ -60,6 +66,7 @@ class ScoreNote {
     final stability = json['stability'] as Map<String, dynamic>;
     final drift = json['phrase_end_drift'] as Map<String, dynamic>;
     final glide = json['glide'] as Map<String, dynamic>;
+    final pause = json['pause'] as Map<String, dynamic>;
     return ScoreNote(
       index: json['index'] as int,
       startT: (json['start_t'] as num).toDouble(),
@@ -84,6 +91,9 @@ class ScoreNote {
       glideOnsetCentsDeviation: (glide['onset_cents_deviation'] as num?)?.toDouble(),
       glideFlag: glide['flag'] as bool,
       glideDirection: glide['direction'] as String?,
+      pauseApplicable: pause['applicable'] as bool,
+      pauseGapSeconds: (pause['gap_seconds'] as num?)?.toDouble(),
+      pauseFlag: pause['flag'] as bool,
       sungT: (json['sung_t'] as num?)?.toDouble(),
     );
   }
@@ -115,6 +125,11 @@ class ScoreNote {
           'onset_cents_deviation': glideOnsetCentsDeviation,
           'flag': glideFlag,
           'direction': glideDirection,
+        },
+        'pause': {
+          'applicable': pauseApplicable,
+          'gap_seconds': pauseGapSeconds,
+          'flag': pauseFlag,
         },
         'sung_t': sungT,
       };
@@ -162,6 +177,7 @@ class ScoreSummary {
   final int stabilityFlaggedCount;
   final int phraseEndDriftFlaggedCount;
   final int glideFlaggedCount;
+  final int pauseFlaggedCount;
   final double overallScore;
   final List<String> problemTags;
   final VocalRange vocalRange;
@@ -176,6 +192,7 @@ class ScoreSummary {
     required this.stabilityFlaggedCount,
     required this.phraseEndDriftFlaggedCount,
     required this.glideFlaggedCount,
+    required this.pauseFlaggedCount,
     required this.overallScore,
     required this.problemTags,
     required this.vocalRange,
@@ -191,6 +208,7 @@ class ScoreSummary {
         stabilityFlaggedCount: json['stability_flagged_count'] as int,
         phraseEndDriftFlaggedCount: json['phrase_end_drift_flagged_count'] as int,
         glideFlaggedCount: json['glide_flagged_count'] as int,
+        pauseFlaggedCount: json['pause_flagged_count'] as int,
         overallScore: (json['overall_score'] as num).toDouble(),
         problemTags: (json['problem_tags'] as List).cast<String>(),
         vocalRange: VocalRange.fromJson(json['vocal_range'] as Map<String, dynamic>),
@@ -206,6 +224,7 @@ class ScoreSummary {
         'stability_flagged_count': stabilityFlaggedCount,
         'phrase_end_drift_flagged_count': phraseEndDriftFlaggedCount,
         'glide_flagged_count': glideFlaggedCount,
+        'pause_flagged_count': pauseFlaggedCount,
         'overall_score': overallScore,
         'problem_tags': problemTags,
         'vocal_range': vocalRange.toJson(),

@@ -11,6 +11,7 @@ Map<String, dynamic> _noteJson() => {
       'stability': {'applicable': true, 'mad_cents': 0.8, 'flag': false},
       'phrase_end_drift': {'applicable': true, 'drift_cents': 0.3, 'flag': false, 'direction': null},
       'glide': {'applicable': true, 'onset_cents_deviation': -62.0, 'flag': true, 'direction': 'up'},
+      'pause': {'applicable': true, 'gap_seconds': 0.34, 'flag': true},
       'sung_t': 0.12,
     };
 
@@ -22,6 +23,7 @@ Map<String, dynamic> _resultJson() => {
         'timing_flagged_count': 0, 'stability_flagged_count': 0,
         'phrase_end_drift_flagged_count': 0,
         'glide_flagged_count': 1,
+        'pause_flagged_count': 1,
         'overall_score': 100.0,
         'problem_tags': <String>[],
         'vocal_range': {
