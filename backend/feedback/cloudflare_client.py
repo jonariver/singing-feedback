@@ -109,7 +109,17 @@ def request_feedback_points(
     enthaelt."""
     response = client.create(
         model=model,
-        max_tokens=1024,
+        # Qwen3 ist ein "Reasoning"-Modell: es generiert vor der eigentlichen
+        # Antwort eine lange interne Denkkette (response["result"]["choices"][0]
+        # ["message"]["reasoning_content"]), die selbst schon 1024 Tokens
+        # aufbrauchen kann, bevor der eigentliche Tool-Call ueberhaupt beginnt -
+        # live beobachtet: bei max_tokens=1024 brach die Antwort mit
+        # finish_reason="length" mitten im JSON des Tool-Calls ab, "tool_calls"
+        # blieb leer. Cloudflares Workers-AI-Schema fuer dieses Modell bietet
+        # (Stand jetzt) keinen Parameter, um die Denkkette abzuschalten - 4096
+        # gibt ihr genug Raum, bei weiterhin vernachlaessigbaren Kosten
+        # (~$0.34/Mio Output-Tokens).
+        max_tokens=4096,
         messages=[{"role": "user", "content": prompt_text}],
         tools=[_tool_schema_openai(catalog_ids)],
     )
