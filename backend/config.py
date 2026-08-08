@@ -78,6 +78,10 @@ GLIDE_HEAD_SECONDS = 0.15
 GLIDE_MIN_HEAD_FRAMES = 3
 GLIDE_ONSET_THRESHOLD_CENTS = 60.0
 
+# Bewertungs-Engine: Pausen/Atemstellen-Erkennung (Phase 4-Rest, Teil 3) - siehe
+# docs/superpowers/specs/2026-08-08-pausen-atemstellen-design.md.
+PAUSE_MIN_GAP_SECONDS = 0.25
+
 # Bewertungs-Engine: Stimmumfang der Aufnahme (Phase 4-Rest, Teil 2) - siehe
 # docs/superpowers/specs/2026-08-07-vocal-range-design.md.
 VOCAL_RANGE_LOW_PERCENTILE = 5.0

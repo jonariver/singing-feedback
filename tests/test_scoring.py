@@ -382,6 +382,95 @@ def test_compute_glide_not_applicable_when_note_shorter_than_head_window():
     assert result["applicable"] is False
 
 
+from backend.scoring.pauses import compute_pause
+
+
+def test_compute_pause_flags_genuine_gap_in_held_note():
+    # Gehaltene Note 1.0-3.0s (2s, ueber HELD_NOTE_MIN_DURATION_SECONDS=0.6s).
+    # Betrachtetes Fenster beginnt bei 1.05s (Onset-Trim). Stimmhaft bis 1.50s, dann
+    # eine 0.29s lange unstimmhafte Luecke (ueber PAUSE_MIN_GAP_SECONDS=0.25s), danach
+    # wieder stimmhaft bis zum Notenende.
+    note = {"start_t": 1.0, "end_t": 3.0, "hz": 440.0}
+    voiced_before = [
+        _sung_frame(round(1.05 + i * 0.01, 3), 440.0, aligned_t=round(1.05 + i * 0.01, 3))
+        for i in range(45)
+    ]
+    gap_frames = [
+        _sung_frame(round(1.50 + i * 0.01, 3), None, voiced=False, aligned_t=round(1.50 + i * 0.01, 3))
+        for i in range(30)
+    ]
+    voiced_after = [
+        _sung_frame(round(1.80 + i * 0.01, 3), 440.0, aligned_t=round(1.80 + i * 0.01, 3))
+        for i in range(100)
+    ]
+    result = compute_pause(note, voiced_before + gap_frames + voiced_after)
+    assert result["applicable"] is True
+    assert result["flag"] is True
+    assert result["gap_seconds"] == pytest.approx(0.29, abs=0.01)
+
+
+def test_compute_pause_does_not_flag_short_gap():
+    # Gleiche Note, aber die Luecke ist nur 0.1s lang - unter der Schwelle.
+    note = {"start_t": 1.0, "end_t": 3.0, "hz": 440.0}
+    voiced_before = [
+        _sung_frame(round(1.05 + i * 0.01, 3), 440.0, aligned_t=round(1.05 + i * 0.01, 3))
+        for i in range(45)
+    ]
+    gap_frames = [
+        _sung_frame(round(1.50 + i * 0.01, 3), None, voiced=False, aligned_t=round(1.50 + i * 0.01, 3))
+        for i in range(10)
+    ]
+    voiced_after = [
+        _sung_frame(round(1.60 + i * 0.01, 3), 440.0, aligned_t=round(1.60 + i * 0.01, 3))
+        for i in range(100)
+    ]
+    result = compute_pause(note, voiced_before + gap_frames + voiced_after)
+    assert result["applicable"] is True
+    assert result["flag"] is False
+    assert result["gap_seconds"] == pytest.approx(0.09, abs=0.01)
+
+
+def test_compute_pause_not_applicable_for_short_note():
+    # Nicht gehaltene Note (< HELD_NOTE_MIN_DURATION_SECONDS=0.6s).
+    note = {"start_t": 0.0, "end_t": 0.3, "hz": 440.0}
+    result = compute_pause(note, [])
+    assert result["applicable"] is False
+    assert result["gap_seconds"] is None
+    assert result["flag"] is False
+
+
+def test_compute_pause_not_applicable_without_frames_in_window():
+    # Gehaltene Note, aber alle Frames liegen VOR dem Onset-Trim-Fenster (< start_t +
+    # STABILITY_ONSET_TRIM_SECONDS) - nach dem Trim bleibt nichts uebrig.
+    note = {"start_t": 1.0, "end_t": 2.0, "hz": 440.0}
+    frames = [_sung_frame(1.0, 440.0, aligned_t=1.0)]
+    result = compute_pause(note, frames)
+    assert result["applicable"] is False
+
+
+def test_compute_pause_excludes_onset_trim_window():
+    # Der allererste Notenanfang (0.00-0.04s, VOR dem Trim-Fenster bei 0.05s) ist
+    # unstimmhaft (z.B. Konsonanten-Einsatz "T") - danach durchgehend stimmhaft. Ohne
+    # den Onset-Trim wuerde diese kurze Luecke evtl. mitgezaehlt (hier zu kurz, um die
+    # Schwelle zu reissen, aber der Test soll sicherstellen, dass sie erst gar nicht
+    # als Luecke im betrachteten Fenster erscheint - alle Frames im Fenster sind
+    # stimmhaft, gap_seconds muss 0.0 sein, nicht die Dauer der VOR dem Fenster
+    # liegenden Konsonanten-Luecke).
+    note = {"start_t": 0.0, "end_t": 1.0, "hz": 440.0}
+    onset_gap = [
+        _sung_frame(round(i * 0.01, 3), None, voiced=False, aligned_t=round(i * 0.01, 3))
+        for i in range(4)
+    ]
+    voiced = [
+        _sung_frame(round(0.05 + i * 0.01, 3), 440.0, aligned_t=round(0.05 + i * 0.01, 3))
+        for i in range(90)
+    ]
+    result = compute_pause(note, onset_gap + voiced)
+    assert result["applicable"] is True
+    assert result["flag"] is False
+    assert result["gap_seconds"] == pytest.approx(0.0, abs=0.001)
+
+
 def test_hz_to_midi_note_reference_a4():
     assert hz_to_midi_note(440.0) == 69
 
